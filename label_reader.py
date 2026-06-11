@@ -118,6 +118,7 @@ def extract_label_data(image_path):
                             clean_city_parts.append(city_part)
 
                     city = " ".join(clean_city_parts)
+                    city = city.strip(",")
                     state = part
 
                     street_address_line = lines[line_index - 1]
