@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Label Reader POC</title>
+</head>
+<body>
+
+    <h1>Label Reader POC</h1>
+
+    <p>Upload a shipping label image.</p>
+
+    <form
+        action="/upload"
+        method="POST"
+        enctype="multipart/form-data"
+    >
+        <input
+            type="file"
+            name="label_image"
+            accept="image/*"
+        >
+
+        <button type="submit">
+            Upload
+        </button>
+    </form>
+
+    <h2>JSON Output</h2>
+
+    {% if error_message %}
+        <p style="color:red;">
+            {{ error_message }}
+        </p>
+    {% endif %}
+
+    {% if label_data %}
+        <pre>{{ label_data }}</pre>
+    {% else %}
+        <pre>{}</pre>
+    {% endif %}
+
+</body>
+</html>
