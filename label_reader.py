@@ -147,10 +147,7 @@ def extract_label_data(image_path):
                     for recipient_name_part in recipient_name_parts[
                         recipient_name_index:
                     ]:
-                        if (
-                            recipient_name_part.isupper()
-                            and not recipient_name_part.isdigit()
-                        ):
+                        if recipient_name_part.isalpha():
                             clean_recipient_name_parts.append(recipient_name_part)
 
                     recipient_name = " ".join(clean_recipient_name_parts)
