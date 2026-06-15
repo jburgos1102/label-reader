@@ -46,17 +46,35 @@ def get_best_ocr_text(image):
 
         score = 0
 
+        upper_text = text.upper()
+
+        if "DELIVER TO" in upper_text:
+            score += 5
+
+        if "WARMINSTER" in upper_text:
+            score += 3
+
+        if "BAIRD" in upper_text:
+            score += 3
+
+        if "UNIUNI" in upper_text:
+            score += 2
+
         if re.search(r"\b[A-Z]{2}\s+\d{5}", text):
             score += 5
 
         if re.search(r"\b[A-Z]{2}\s+\d{5}[-–— ]?\d{4}", text):
             score += 5
 
-        if "TRACKING" in text.upper():
+        if "TRACKING" in upper_text:
             score += 2
 
-        if "USPS" in text.upper():
+        if "USPS" in upper_text:
             score += 1
+
+        print(f"OCR ROTATION {degrees} SCORE:", score)
+        print(text[:200])
+        print("---")
 
         if score > best_score:
             best_score = score
