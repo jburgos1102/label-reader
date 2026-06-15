@@ -98,7 +98,8 @@ def extract_label_data(image_path):
 
     if not label_data["tracking_number"]:
         for line in lines:
-            tracking_match = re.fullmatch(r"[A-Z0-9]{14,20}", line)
+            clean_tracking_line = line.replace("|", "").strip()
+            tracking_match = re.fullmatch(r"[A-Z0-9]{14,20}", clean_tracking_line)
 
             if tracking_match:
                 tracking_candidate = tracking_match.group()
@@ -181,6 +182,26 @@ def extract_label_data(image_path):
                 city = parts[3]
                 state = parts[5]
                 full_zip = parts[0] + "-" + parts[2]
+
+                label_data["recipient_name"] = recipient_name
+                label_data["street_address"] = street_address
+                label_data["city"] = city
+                label_data["state"] = state
+                label_data["zip_code"] = full_zip
+
+        if len(parts) >= 4:
+            zip_first_match = re.fullmatch(r"(\d{5})[-–—](\d{4})", parts[0])
+            state_match = re.fullmatch(r"[A-Z]{2}", parts[3])
+
+            print("ZIP-FIRST COMBINED ZIP:", bool(zip_first_match))
+            print("ZIP-FIRST COMBINED STATE:", bool(state_match))
+
+            if zip_first_match and state_match:
+                recipient_name = lines[line_index - 2]
+                street_address = lines[line_index - 1]
+                city = parts[1]
+                state = parts[3]
+                full_zip = zip_first_match.group(1) + "-" + zip_first_match.group(2)
 
                 label_data["recipient_name"] = recipient_name
                 label_data["street_address"] = street_address
