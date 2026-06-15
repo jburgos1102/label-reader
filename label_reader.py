@@ -6,19 +6,30 @@ import re
 
 def extract_tracking_number(image):
     rotations = [0, 90, 180, 270]
+    min_tracking_length = 15
 
     for degrees in rotations:
         rotated_image = image.rotate(degrees, expand=True)
         barcodes = decode(rotated_image)
 
         if barcodes:
-            barcode_data = barcodes[0].data.decode("utf-8")
-            barcode_parts = barcode_data.split("\x1d")
+            print(f"\n--- BARCODES FOUND AT ROTATION {degrees} ---")
 
-            if len(barcode_parts) > 1:
-                return barcode_parts[1]
+            for barcode_index, barcode in enumerate(barcodes):
+                barcode_data = barcode.data.decode("utf-8")
+                print(barcode_index, repr(barcode_data), barcode.type)
 
-            return barcode_data
+                barcode_parts = barcode_data.split("\x1d")
+
+                if len(barcode_parts) > 1:
+                    candidate = barcode_parts[1]
+                else:
+                    candidate = barcode_data
+
+                print("TRACKING CANDIDATE:", repr(candidate))
+
+                if len(candidate) >= min_tracking_length:
+                    return candidate
 
     return ""
 
