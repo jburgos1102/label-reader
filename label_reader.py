@@ -162,6 +162,32 @@ def extract_label_data(image_path):
 
         parts = line.split()
 
+        if "18974" in line:
+            print("ZIP-FIRST PARTS:", parts)
+
+        if len(parts) >= 6:
+            zip_match = re.fullmatch(r"\d{5}", parts[0])
+            separator_match = re.fullmatch(r"[-–—]", parts[1])
+            plus_four_match = re.fullmatch(r"\d{4}", parts[2])
+            state_match = re.fullmatch(r"[A-Z]{2}", parts[5])
+
+            print("ZIP-FIRST ZIP:", bool(zip_match))
+            print("ZIP-FIRST PLUS4:", bool(plus_four_match))
+            print("ZIP-FIRST STATE:", bool(state_match))
+
+            if zip_match and plus_four_match and state_match:
+                recipient_name = lines[line_index - 3]
+                street_address = lines[line_index - 1]
+                city = parts[3]
+                state = parts[5]
+                full_zip = parts[0] + "-" + parts[2]
+
+                label_data["recipient_name"] = recipient_name
+                label_data["street_address"] = street_address
+                label_data["city"] = city
+                label_data["state"] = state
+                label_data["zip_code"] = full_zip
+
         for index, part in enumerate(parts):
             state_match = re.fullmatch(r"[A-Z]{2}", part)
 
