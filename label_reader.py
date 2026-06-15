@@ -96,6 +96,21 @@ def extract_label_data(image_path):
     for line_index, line in enumerate(lines):
         print(line_index, repr(line))
 
+    if not label_data["tracking_number"]:
+        for line in lines:
+            tracking_match = re.fullmatch(r"[A-Z0-9]{14,20}", line)
+
+            if tracking_match:
+                tracking_candidate = tracking_match.group()
+
+                if tracking_candidate.startswith("1BA"):
+                    tracking_candidate = "TBA" + tracking_candidate[3:]
+
+                print("OCR TRACKING CANDIDATE:", repr(tracking_candidate))
+
+                label_data["tracking_number"] = tracking_candidate
+                break
+
     used_deliver_to_block = False
 
     for line_index, line in enumerate(lines):
