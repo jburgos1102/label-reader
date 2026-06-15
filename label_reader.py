@@ -85,7 +85,55 @@ def extract_label_data(image_path):
     for line_index, line in enumerate(lines):
         print(line_index, repr(line))
 
+    used_deliver_to_block = False
+
     for line_index, line in enumerate(lines):
+        if "DELIVER TO" in line.upper():
+            print(f"\nFOUND DELIVER TO AT LINE {line_index}")
+
+            if line_index + 3 < len(lines):
+                print("DELIVER TO HAS ENOUGH LINES")
+                deliver_to_name = lines[line_index + 1]
+                deliver_to_street = lines[line_index + 2]
+                deliver_to_city_line = lines[line_index + 3]
+                deliver_to_street = deliver_to_street.replace(
+                    "RETURN SERVICE REQUESTED", ""
+                )
+                deliver_to_street = deliver_to_street.strip()
+
+                print("DELIVER TO NAME:", repr(deliver_to_name))
+                print("DELIVER TO STREET:", repr(deliver_to_street))
+                print("DELIVER TO CITY LINE:", repr(deliver_to_city_line))
+
+                deliver_to_city_parts = deliver_to_city_line.split()
+
+                print("DELIVER TO CITY PARTS:", deliver_to_city_parts)
+
+                if len(deliver_to_city_parts) >= 3:
+                    state_candidate = deliver_to_city_parts[-2]
+                    zip_candidate = deliver_to_city_parts[-1]
+
+                    state_match = re.fullmatch(r"[A-Z]{2}", state_candidate)
+                    zip_match = re.fullmatch(r"\d{5}", zip_candidate)
+
+                    print("STATE MATCH:", bool(state_match))
+                    print("ZIP MATCH:", bool(zip_match))
+
+                    if state_match and zip_match:
+                        deliver_to_city = " ".join(deliver_to_city_parts[:-2])
+                        deliver_to_city = deliver_to_city.strip(",")
+
+                        label_data["recipient_name"] = deliver_to_name
+                        label_data["street_address"] = deliver_to_street
+                        label_data["city"] = deliver_to_city
+                        label_data["state"] = state_candidate
+                        label_data["zip_code"] = zip_candidate
+
+                        used_deliver_to_block = True
+
+        if used_deliver_to_block:
+            continue
+
         parts = line.split()
 
         for index, part in enumerate(parts):
