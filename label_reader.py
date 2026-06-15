@@ -134,6 +134,45 @@ def extract_label_data(image_path):
 
     for line_index, line in enumerate(lines):
         if "DELIVER TO" in line.upper():
+
+            if "USPS" not in line.upper():
+                print(f"\nFOUND NON-USPS DELIVER TO AT LINE {line_index}")
+
+                for nearby_index in range(line_index, min(line_index + 6, len(lines))):
+                    print(nearby_index, repr(lines[nearby_index]))
+
+                if line_index + 4 < len(lines):
+                    uniuni_city_state_line = lines[line_index + 2]
+                    uniuni_street_line = lines[line_index + 3]
+                    uniuni_zip_line = lines[line_index + 4]
+
+                    print("UNIUNI CITY/STATE CANDIDATE:", repr(uniuni_city_state_line))
+                    print("UNIUNI STREET CANDIDATE:", repr(uniuni_street_line))
+                    print("UNIUNI ZIP CANDIDATE:", repr(uniuni_zip_line))
+
+                    uniuni_city_state_match = re.search(
+                        r"([A-Za-z]+),?\s+([A-Z]{2}),?",
+                        uniuni_city_state_line,
+                    )
+                    uniuni_street_match = re.match(r"\d+", uniuni_street_line)
+                    uniuni_zip_match = re.search(r"\d{5}", uniuni_zip_line)
+
+                    print("UNIUNI CITY/STATE MATCH:", bool(uniuni_city_state_match))
+                    print("UNIUNI STREET MATCH:", bool(uniuni_street_match))
+                    print("UNIUNI ZIP MATCH:", bool(uniuni_zip_match))
+
+                    if (
+                        uniuni_city_state_match
+                        and uniuni_street_match
+                        and uniuni_zip_match
+                    ):
+                        label_data["street_address"] = uniuni_street_line
+                        label_data["city"] = uniuni_city_state_match.group(1)
+                        label_data["state"] = uniuni_city_state_match.group(2)
+                        label_data["zip_code"] = uniuni_zip_match.group()
+
+                        used_deliver_to_block = True
+
             print(f"\nFOUND DELIVER TO AT LINE {line_index}")
 
             if line_index + 3 < len(lines):
