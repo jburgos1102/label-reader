@@ -87,6 +87,8 @@ def get_best_ocr_text(image):
 def normalize_extracted_fields(label_data):
     street_address = label_data.get("street_address", "")
     tracking_number = label_data.get("tracking_number", "")
+    recipient_name = label_data.get("recipient_name", "")
+    city = label_data.get("city", "")
 
     if street_address:
         street_address = street_address.strip()
@@ -117,6 +119,18 @@ def normalize_extracted_fields(label_data):
             else tracking_number
         )
         label_data["tracking_number"] = tracking_number
+
+    if recipient_name:
+        recipient_name = recipient_name.strip()
+        recipient_name = re.sub(r"\s+", " ", recipient_name)
+        recipient_name = recipient_name.title()
+        label_data["recipient_name"] = recipient_name
+
+    if city:
+        city = city.strip()
+        city = re.sub(r"\s+", " ", city)
+        city = city.title()
+        label_data["city"] = city
 
     return label_data
 
