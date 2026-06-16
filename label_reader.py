@@ -83,6 +83,44 @@ def get_best_ocr_text(image):
     return best_text
 
 
+# --- NORMALIZATION FUNCTION ---
+def normalize_extracted_fields(label_data):
+    street_address = label_data.get("street_address", "")
+    tracking_number = label_data.get("tracking_number", "")
+
+    if street_address:
+        street_address = street_address.strip()
+        street_address = re.sub(r"\s+", " ", street_address)
+
+        street_address = re.sub(
+            r"\b(BE|8T|5T)\b$",
+            "ST",
+            street_address,
+            flags=re.IGNORECASE,
+        )
+
+        street_address = re.sub(
+            r"\b(st|rd|ave|blvd|dr|ln|ct)\b$",
+            lambda match: match.group().upper(),
+            street_address,
+            flags=re.IGNORECASE,
+        )
+
+        label_data["street_address"] = street_address
+
+    if tracking_number:
+        tracking_number = tracking_number.strip()
+        tracking_number = tracking_number.replace(" ", "")
+        tracking_number = (
+            tracking_number.replace("O", "0")
+            if tracking_number.startswith("1LSDO")
+            else tracking_number
+        )
+        label_data["tracking_number"] = tracking_number
+
+    return label_data
+
+
 # --- SCORING FUNCTION ---
 def score_label_data(label_data):
     confidence = {
@@ -447,6 +485,7 @@ def extract_label_data(image_path):
                     label_data["state"] = state
                     label_data["zip_code"] = full_zip
 
+    label_data = normalize_extracted_fields(label_data)
     label_data = score_label_data(label_data)
 
     return label_data
