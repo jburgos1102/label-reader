@@ -229,6 +229,8 @@ def extract_label_data(image_path):
         "state": "",
         "zip_code": "",
         "tracking_number": "",
+        "parser_used": "",
+        "parser_matches": [],
     }
 
     label_data["tracking_number"] = extract_tracking_number(image)
@@ -305,6 +307,8 @@ def extract_label_data(image_path):
                         label_data["city"] = uniuni_city_state_match.group(1)
                         label_data["state"] = uniuni_city_state_match.group(2)
                         label_data["zip_code"] = uniuni_zip_match.group()
+                        label_data["parser_used"] = "uniuni_deliver_to"
+                        label_data["parser_matches"].append("uniuni_deliver_to")
 
                         used_deliver_to_block = True
 
@@ -347,6 +351,8 @@ def extract_label_data(image_path):
                         label_data["city"] = deliver_to_city
                         label_data["state"] = state_candidate
                         label_data["zip_code"] = zip_candidate
+                        label_data["parser_used"] = "deliver_to"
+                        label_data["parser_matches"].append("deliver_to")
 
                         used_deliver_to_block = True
 
@@ -380,6 +386,8 @@ def extract_label_data(image_path):
                 label_data["city"] = city
                 label_data["state"] = state
                 label_data["zip_code"] = full_zip
+                label_data["parser_used"] = "zip_first_spaced"
+                label_data["parser_matches"].append("zip_first_spaced")
 
         if len(parts) >= 4:
             zip_first_match = re.fullmatch(r"(\d{5})[-–—](\d{4})", parts[0])
@@ -400,6 +408,8 @@ def extract_label_data(image_path):
                 label_data["city"] = city
                 label_data["state"] = state
                 label_data["zip_code"] = full_zip
+                label_data["parser_used"] = "zip_first_combined"
+                label_data["parser_matches"].append("zip_first_combined")
 
         country_zip_match = re.fullmatch(
             r"(.+?),\s*([A-Z]{2}),\s*(?:US|USA),?\s*(\d{5})",
@@ -422,6 +432,8 @@ def extract_label_data(image_path):
                 label_data["city"] = city
                 label_data["state"] = state
                 label_data["zip_code"] = zip_code
+                label_data["parser_used"] = "city_state_country_zip"
+                label_data["parser_matches"].append("city_state_country_zip")
 
         for index, part in enumerate(parts):
             state_match = re.fullmatch(r"[A-Z]{2}", part)
@@ -498,6 +510,8 @@ def extract_label_data(image_path):
                     label_data["city"] = city
                     label_data["state"] = state
                     label_data["zip_code"] = full_zip
+                    label_data["parser_used"] = "generic_city_state_zip"
+                    label_data["parser_matches"].append("generic_city_state_zip")
 
     label_data = normalize_extracted_fields(label_data)
     label_data = score_label_data(label_data)
