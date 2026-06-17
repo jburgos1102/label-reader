@@ -1,4 +1,197 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Label Reader POC</title>
+    <style>
+        :root {
+            --page: #252322;
+            --panel: #1a1515;
+            --row: #2d2928;
+            --row-border: #5e6061;
+            --text: #f3eeee;
+            --muted: #b8b0b0;
+            --accent: #0093d1;
+            --accent-hover: #00a4e8;
+            --danger: #ff6b6b;
+            --code: #0f0b0c;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            background: var(--page);
+            color: var(--text);
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .app {
+            width: min(100%, 980px);
+            min-height: 100vh;
+            padding: 24px clamp(18px, 5vw, 72px) 36px;
+        }
+
+        h1 {
+            margin: 0 0 26px;
+            font-size: clamp(28px, 5vw, 42px);
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .panel {
+            width: min(100%, 760px);
+            padding: clamp(24px, 5vw, 44px);
+            border: 1px solid var(--row-border);
+            background: var(--panel);
+        }
+
+        .section-title {
+            margin: 0 0 10px;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .helper-text {
+            margin: 0 0 12px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .upload-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: center;
+            min-height: 52px;
+            margin-bottom: 26px;
+            padding: 10px;
+            background: var(--row);
+            border: 1px solid var(--row-border);
+        }
+
+        input[type="file"] {
+            width: 100%;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        input[type="file"]::file-selector-button {
+            margin-right: 12px;
+            padding: 9px 13px;
+            border: 0;
+            border-radius: 4px;
+            background: #efefef;
+            color: #171313;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        button {
+            min-width: 118px;
+            min-height: 38px;
+            padding: 0 22px;
+            border: 0;
+            border-radius: 7px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover,
+        button:focus-visible {
+            background: var(--accent-hover);
+        }
+
+        .error {
+            margin: 0 0 12px;
+            color: var(--danger);
+            font-weight: 700;
+        }
+
+        pre {
+            min-height: 240px;
+            max-height: 420px;
+            margin: 0;
+            padding: 18px;
+            overflow: auto;
+            border: 1px solid var(--row-border);
+            background: var(--code);
+            color: #e8f7ff;
+            font-size: 14px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 620px) {
+            .app {
+                padding: 20px 16px 28px;
+            }
+
+            .panel {
+                padding: 20px;
+            }
+
+            .upload-row {
+                grid-template-columns: 1fr;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <h1>Label Reader POC</h1>
+
+        <section class="panel" aria-labelledby="upload-title">
+            <h2 class="section-title" id="upload-title">Upload Label</h2>
+            <p class="helper-text">Upload a shipping label image.</p>
+
+            <form
+                action="/upload"
+                method="POST"
+                enctype="multipart/form-data"
+            >
+                <div class="upload-row">
+                    <input
+                        type="file"
+                        name="label_image"
+                        accept="image/*"
+                    >
+
+                    <button type="submit">
+                        Upload
+                    </button>
+                </div>
+            </form>
+
+            <h2 class="section-title">JSON Output</h2>
+
+            {% if error_message %}
+                <p class="error">
+                    {{ error_message }}
+                </p>
+            {% endif %}
+
+            {% if label_data %}
+                <pre>{{ label_data }}</pre>
+            {% else %}
+                <pre>{}</pre>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>
+
+<!-- <!DOCTYPE html>
 <html>
 <head>
     <title>Label Reader POC</title>
@@ -46,4 +239,4 @@
     {% endif %}
 
 </body>
-</html>
+</html> -->
