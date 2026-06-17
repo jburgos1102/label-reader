@@ -412,7 +412,7 @@ def extract_label_data(image_path):
             print("ZIP-FIRST PLUS4:", bool(plus_four_match))
             print("ZIP-FIRST STATE:", bool(state_match))
 
-            if zip_match and plus_four_match and state_match:
+            if zip_match and plus_four_match and state_match and line_index >= 3:
                 recipient_name = lines[line_index - 3]
                 street_address = lines[line_index - 1]
                 city = parts[3]
@@ -435,7 +435,7 @@ def extract_label_data(image_path):
             print("ZIP-FIRST COMBINED ZIP:", bool(zip_first_match))
             print("ZIP-FIRST COMBINED STATE:", bool(state_match))
 
-            if zip_first_match and state_match:
+            if zip_first_match and state_match and line_index >= 2:
                 recipient_name = lines[line_index - 2]
                 street_address = lines[line_index - 1]
                 city = parts[1]
