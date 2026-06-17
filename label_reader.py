@@ -105,6 +105,12 @@ def identify_carrier(tracking_number):
     if tracking_number.startswith(("92", "93", "94", "95")):
         return "USPS"
 
+    if tracking_number.startswith("56") and len(tracking_number) >= 20:
+        return "USPS"
+
+    if tracking_number.startswith("1Z"):
+        return "UPS"
+
     return "Unknown"
 
 
@@ -550,6 +556,7 @@ def extract_label_data(image_path):
                         label_data["parser_matches"].append("generic_city_state_zip")
 
     label_data = normalize_extracted_fields(label_data)
+    label_data["carrier"] = identify_carrier(label_data["tracking_number"])
     label_data = score_label_data(label_data)
 
     return label_data
