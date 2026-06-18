@@ -1,0 +1,13 @@
+{
+    "recipient_name": "Lucy Smith",
+    "street_address": "28 N. COLLEGE STREET HUB 2199",
+    "city": "Carlisle",
+    "state": "PA",
+    "zip_code": "17013",
+    "tracking_number": "9205590161979232940090",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

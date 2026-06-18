@@ -1,0 +1,13 @@
+{
+    "recipient_name": "Sharon Gintz",
+    "street_address": "3720 VICTORIA DR",
+    "city": "West Palm Beach",
+    "state": "FL",
+    "zip_code": "33406",
+    "tracking_number": "73720VICTORIADR",
+    "carrier": "FEDEX",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

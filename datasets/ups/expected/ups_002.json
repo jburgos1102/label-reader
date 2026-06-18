@@ -1,0 +1,13 @@
+{
+    "recipient_name": "BENJAMIN PLAWKER",
+    "street_address": "HUB # 1610 DICKINSON COLLEGE 28 N COLLEGE ST",
+    "city": "Carlisle",
+    "state": "PA",
+    "zip_code": "17013-2311",
+    "tracking_number": "1Z09271R0305043279",
+    "carrier": "UPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

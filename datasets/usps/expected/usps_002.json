@@ -1,0 +1,13 @@
+{
+    "recipient_name": "Xinyi Wu",
+    "street_address": "28 N College St",
+    "city": "Carlisle",
+    "state": "PA",
+    "zip_code": "17013-2311",
+    "tracking_number": "9205590202330872234363",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

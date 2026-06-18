@@ -1,0 +1,13 @@
+{
+    "recipient_name": "",
+    "street_address": "PO BOX 1773",
+    "city": "Carlisle",
+    "state": "PA",
+    "zip_code": "17013-2896",
+    "tracking_number": "9505513421769081250861",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

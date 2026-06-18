@@ -1,0 +1,13 @@
+{
+    "recipient_name": "MIN XIE",
+    "street_address": "HUB2453, DICKINSON COLLEGE 28 N COLLEGE ST",
+    "city": "Carlisle",
+    "state": "PA",
+    "zip_code": "17013-2311",
+    "tracking_number": "92055902416755000000764928",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}
