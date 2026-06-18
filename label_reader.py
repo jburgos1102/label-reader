@@ -552,6 +552,122 @@ def extract_label_data(image_path):
                 if "city_state_country_zip" not in label_data["parser_matches"]:
                     label_data["parser_matches"].append("city_state_country_zip")
 
+        college_mailroom_match = re.fullmatch(
+            r"([A-Za-z][A-Za-z .'-]*?),?\s+([A-Z]{2})\s+(\d{5}(?:\s*[-–—]\s*\d{4})?)(?:\s+UNITED STATES)?\W*",
+            line,
+        )
+
+        if college_mailroom_match and line_index >= 2:
+            city = college_mailroom_match.group(1).strip().strip(",")
+            state = college_mailroom_match.group(2)
+            zip_code = re.sub(
+                r"\s*[-–—]\s*",
+                "-",
+                college_mailroom_match.group(3),
+            )
+
+            previous_lines = lines[:line_index]
+            mailroom_keywords = (
+                "COLLEGE",
+                "HUB",
+                "UNIVERSITY",
+                "PENN STATER",
+                "ALUMNI CENTER",
+            )
+            previous_text = " ".join(previous_lines).upper()
+            college_city_match = city.upper() in ("CARLISLE", "UNIVERSITY PARK")
+            college_context_match = any(
+                keyword in previous_text for keyword in mailroom_keywords
+            )
+
+            print(
+                "COLLEGE MAILROOM CITY/STATE/ZIP MATCH:",
+                college_mailroom_match.groups(),
+            )
+            print("COLLEGE MAILROOM CONTEXT:", college_city_match, college_context_match)
+
+            if college_city_match or college_context_match:
+                address_end_index = line_index - 1
+
+                if re.fullmatch(r"\d{2,5}", lines[address_end_index]):
+                    address_end_index -= 1
+
+                address_start_index = address_end_index
+
+                # Build the address from the contiguous mailroom/street lines above
+                # city/state/ZIP, stopping before the recipient line.
+                while address_start_index - 1 >= 0:
+                    previous_line = lines[address_start_index - 1]
+                    previous_upper = previous_line.upper()
+
+                    if (
+                        any(
+                            keyword in previous_upper
+                            for keyword in mailroom_keywords
+                        )
+                        or re.search(r"\bP\.?\s*O\.?\s+BOX\b", previous_upper)
+                    ):
+                        address_start_index -= 1
+                    else:
+                        break
+
+                address_lines = lines[address_start_index : address_end_index + 1]
+
+                if address_start_index - 1 >= 0:
+                    recipient_name = lines[address_start_index - 1]
+                else:
+                    recipient_name = ""
+
+                clean_address_lines = []
+
+                for address_line in address_lines:
+                    address_line = re.sub(
+                        r"^\s*(?:TO|SHIP)\s*:\s*",
+                        "",
+                        address_line,
+                        flags=re.IGNORECASE,
+                    )
+                    address_line = re.sub(
+                        r"^\s*IP\s+UB\b",
+                        "HUB",
+                        address_line,
+                        flags=re.IGNORECASE,
+                    )
+                    address_line = re.sub(
+                        r"^(\d+)\s*N,\s+",
+                        r"\1 N. ",
+                        address_line,
+                        flags=re.IGNORECASE,
+                    )
+                    address_line = address_line.strip()
+
+                    if address_line:
+                        clean_address_lines.append(address_line)
+
+                recipient_name = re.sub(
+                    r"^\s*(?:TO|SHIP)\s*:?\s*",
+                    "",
+                    recipient_name,
+                    flags=re.IGNORECASE,
+                ).strip()
+
+                if recipient_name.upper() in ("TO", "TO:"):
+                    recipient_name = ""
+
+                street_address = " ".join(clean_address_lines)
+
+                label_data["recipient_name"] = recipient_name
+                label_data["street_address"] = street_address
+                label_data["city"] = city
+                label_data["state"] = state
+                label_data["zip_code"] = zip_code
+                label_data["parser_used"] = "college_mailroom_parser"
+                if "college_mailroom_parser" not in label_data["parser_matches"]:
+                    label_data["parser_matches"].append("college_mailroom_parser")
+
+        if label_data["parser_used"] == "college_mailroom_parser":
+            continue
+
         for index, part in enumerate(parts):
             state_match = re.fullmatch(r"[A-Z]{2}", part)
 
