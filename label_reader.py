@@ -270,6 +270,127 @@ def extract_tracking_from_ocr_lines(lines):
     return ""
 
 
+def clean_address_service_text(value):
+    value = re.sub(
+        r"\b(?:CARRIER\s*[—-]\s*LEAVE IF NO RESPONSE|RETURN SERVICE REQUESTED|ADDRESS SERVICE REQUESTED|SERVICE REQUESTED)\b.*",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+    value = re.sub(r"\s+", " ", value)
+
+    return value.strip()
+
+
+def clean_address_ocr(value):
+    value = clean_address_service_text(value)
+    value = re.sub(r"(?<=\d)@(?=\d)", "0", value)
+    value = re.sub(r"\b1@5\b", "105", value, flags=re.IGNORECASE)
+    value = re.sub(r"\bAUB\b", "HUB", value, flags=re.IGNORECASE)
+    value = re.sub(r"\bPRRLISLE\b", "CARLISLE", value, flags=re.IGNORECASE)
+    value = re.sub(r"\b\\?IVERSITY\b", "UNIVERSITY", value, flags=re.IGNORECASE)
+    value = re.sub(r"\s+", " ", value)
+
+    return value.strip()
+
+
+def clean_parser_name(value):
+    value = re.sub(r"^\s*(?:TO|SHIP)\s*:?\s*", "", value, flags=re.IGNORECASE)
+    value = re.sub(r"\s+", " ", value)
+
+    return value.strip(" |")
+
+
+def is_noise_recipient_line(value):
+    # Recipient candidates come from noisy OCR near the address block; reject
+    # label furniture and address-like text before accepting a line as a name.
+    clean_value = clean_parser_name(value).upper()
+
+    if not clean_value:
+        return True
+
+    if clean_value in (
+        "SHIP",
+        "TO",
+        "PREMIUM",
+        "USPS",
+        "USA",
+        "PARCEL SELECT",
+        "PRIORITY MAIL",
+        "MEDIA MAIL",
+        "OR CURRENT OCCUPANT",
+    ):
+        return True
+
+    if re.search(r"\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b", clean_value):
+        return True
+
+    if re.search(
+        r"\b(?:EXPECTED DELIVERY|POSTAGE|ORIGIN|MAILED FROM|TRACKING|AMAZON|FULFILLMENT|SERVICES|PRIORITY MAIL|PARCEL SELECT)\b",
+        clean_value,
+    ):
+        return True
+
+    if re.search(
+        r"\b(?:STREET|ST|ROAD|RD|AVE|AVENUE|BLVD|DR|LANE|LN|WAY)\b",
+        clean_value,
+    ) and re.search(r"\d", clean_value):
+        return True
+
+    if re.fullmatch(r"[\d\s./#-]+", clean_value):
+        return True
+
+    if len(clean_value) <= 2:
+        return True
+
+    if re.fullmatch(r"[|.=_\-— ]+", clean_value):
+        return True
+
+    return False
+
+
+def choose_recipient_from_lines(lines, start_index, min_index=0):
+    recipient_index = start_index
+
+    while (
+        recipient_index >= min_index
+        and is_noise_recipient_line(lines[recipient_index])
+    ):
+        recipient_index -= 1
+
+    if recipient_index < min_index:
+        return ""
+
+    recipient_name = clean_parser_name(lines[recipient_index])
+    organization_match = re.search(
+        r"\b(?:ALUMNI ASSOCIATIO|DEPT OF|DEPARTMENT OF|CURRENT OCCUPANT)\b",
+        recipient_name,
+        re.IGNORECASE,
+    )
+
+    if organization_match:
+        previous_index = recipient_index - 1
+
+        while previous_index >= min_index:
+            previous_name = clean_parser_name(lines[previous_index])
+
+            if (
+                previous_name
+                and not is_noise_recipient_line(previous_name)
+                and not re.search(r"\d", previous_name)
+                and not re.search(
+                    r"\b(?:MAILED FROM|POSTAGE|SERVICE|REQUESTED)\b",
+                    previous_name,
+                    re.IGNORECASE,
+                )
+            ):
+                return previous_name
+
+            previous_index -= 1
+
+    return recipient_name
+
+
 # --- NORMALIZATION FUNCTION ---
 def normalize_extracted_fields(label_data):
     street_address = label_data.get("street_address", "")
@@ -279,6 +400,7 @@ def normalize_extracted_fields(label_data):
 
     if street_address:
         street_address = street_address.strip()
+        street_address = clean_address_ocr(street_address)
         street_address = re.sub(r"\s+", " ", street_address)
 
         street_address = re.sub(
@@ -315,6 +437,7 @@ def normalize_extracted_fields(label_data):
 
     if city:
         city = city.strip()
+        city = clean_address_ocr(city)
         city = re.sub(r"\s+", " ", city)
         city = city.title()
         label_data["city"] = city
@@ -519,10 +642,8 @@ def extract_label_data(image_path):
                 deliver_to_name = lines[line_index + 1]
                 deliver_to_street = lines[line_index + 2]
                 deliver_to_city_line = lines[line_index + 3]
-                deliver_to_street = deliver_to_street.replace(
-                    "RETURN SERVICE REQUESTED", ""
-                )
-                deliver_to_street = deliver_to_street.strip()
+                deliver_to_name = clean_parser_name(deliver_to_name)
+                deliver_to_street = clean_address_ocr(deliver_to_street)
 
                 print("DELIVER TO NAME:", repr(deliver_to_name))
                 print("DELIVER TO STREET:", repr(deliver_to_street))
@@ -700,10 +821,22 @@ def extract_label_data(image_path):
 
                 address_lines = lines[address_start_index : address_end_index + 1]
 
-                if address_start_index - 1 >= 0:
-                    recipient_name = lines[address_start_index - 1]
-                else:
-                    recipient_name = ""
+                recipient_name = choose_recipient_from_lines(
+                    lines,
+                    address_start_index - 1,
+                    max(0, address_start_index - 4),
+                )
+
+                first_address_line = address_lines[0] if address_lines else ""
+                ship_name_address_match = re.match(
+                    r"^\s*SHIP\s+(.+?)\s+(HUB\b.*)$",
+                    first_address_line,
+                    re.IGNORECASE,
+                )
+
+                if ship_name_address_match:
+                    recipient_name = ship_name_address_match.group(1).strip()
+                    address_lines[0] = ship_name_address_match.group(2).strip()
 
                 clean_address_lines = []
 
@@ -726,19 +859,14 @@ def extract_label_data(image_path):
                         address_line,
                         flags=re.IGNORECASE,
                     )
-                    address_line = address_line.strip()
+                    address_line = clean_address_ocr(address_line)
 
                     if address_line:
                         clean_address_lines.append(address_line)
 
-                recipient_name = re.sub(
-                    r"^\s*(?:TO|SHIP)\s*:?\s*",
-                    "",
-                    recipient_name,
-                    flags=re.IGNORECASE,
-                ).strip()
+                recipient_name = clean_parser_name(recipient_name)
 
-                if recipient_name.upper() in ("TO", "TO:"):
+                if is_noise_recipient_line(recipient_name):
                     recipient_name = ""
 
                 street_address = " ".join(clean_address_lines)
