@@ -185,7 +185,42 @@ def is_valid_tracking_candidate(candidate):
     return False
 
 
+def is_valid_usps_tracking_candidate(candidate):
+    candidate = clean_tracking_candidate(candidate)
+
+    if (
+        candidate.isdigit()
+        and candidate.startswith(("91", "92", "93", "94", "95"))
+        and len(candidate) >= 20
+    ):
+        return True
+
+    if candidate.isdigit() and candidate.startswith("56") and len(candidate) >= 20:
+        return True
+
+    return False
+
+
 def extract_tracking_from_ocr_lines(lines):
+    for line_index, line in enumerate(lines):
+        upper_line = line.upper()
+
+        if "USPS" not in upper_line or "TRACKING" not in upper_line:
+            continue
+
+        candidate_text = line
+
+        for nearby_index in range(line_index + 1, min(line_index + 6, len(lines))):
+            candidate_text += " " + lines[nearby_index]
+
+        numeric_matches = re.findall(r"(?:\d[\s_\-]*){18,34}", candidate_text)
+
+        for numeric_match in numeric_matches:
+            candidate = clean_tracking_candidate(numeric_match)
+
+            if is_valid_usps_tracking_candidate(candidate):
+                return candidate
+
     for line_index, line in enumerate(lines):
         upper_line = line.upper()
 
@@ -410,10 +445,23 @@ def extract_label_data(image_path):
     if ocr_tracking_candidate:
         print("OCR TRACKING CANDIDATE:", repr(ocr_tracking_candidate))
 
+        has_usps_tracking_label = any(
+            "USPS" in line.upper() and "TRACKING" in line.upper()
+            for line in lines
+        )
+        keep_usps_barcode_tracking = (
+            has_usps_tracking_label
+            and identify_carrier(label_data["tracking_number"]) == "USPS"
+            and identify_carrier(ocr_tracking_candidate) == "UPS"
+        )
+
         if (
-            not label_data["tracking_number"]
-            or identify_carrier(label_data["tracking_number"]) == "Unknown"
-            or "TRACKING" in text.upper()
+            not keep_usps_barcode_tracking
+            and (
+                not label_data["tracking_number"]
+                or identify_carrier(label_data["tracking_number"]) == "Unknown"
+                or "TRACKING" in text.upper()
+            )
         ):
             label_data["tracking_number"] = ocr_tracking_candidate
             label_data["carrier"] = identify_carrier(ocr_tracking_candidate)
