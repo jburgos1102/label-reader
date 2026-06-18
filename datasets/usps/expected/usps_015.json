@@ -1,0 +1,13 @@
+{
+    "recipient_name": "CHRISTINA M DIAZ",
+    "street_address": "212 L SOFTBALL PARK",
+    "city": "UNIVERSITY PARK",
+    "state": "PA",
+    "zip_code": "16802",
+    "tracking_number": "92612909838576581008515982",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

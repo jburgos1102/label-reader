@@ -1,0 +1,13 @@
+{
+    "recipient_name": "Lynn Sebulsky",
+    "street_address": "105 SPARKS BLDG",
+    "city": "University Park",
+    "state": "PA",
+    "zip_code": "16802-0000",
+    "tracking_number": "92612999953677571043181200",
+    "carrier": "UPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

@@ -1,0 +1,13 @@
+{
+    "recipient_name": "JONGCHEOL LEE",
+    "street_address": "N334 MILLENNIUM SCIENCE COMPLEX",
+    "city": "University Park",
+    "state": "PA",
+    "zip_code": "16802",
+    "tracking_number": "9361289683090426510853",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

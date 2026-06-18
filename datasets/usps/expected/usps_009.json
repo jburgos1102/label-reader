@@ -1,0 +1,13 @@
+{
+    "recipient_name": "BROOKE WELLER",
+    "street_address": "206-A HINTZ ALUMNI CENTER",
+    "city": "University Park",
+    "state": "PA",
+    "zip_code": "16802",
+    "tracking_number": "9370369903503638146799",
+    "carrier": "USPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}

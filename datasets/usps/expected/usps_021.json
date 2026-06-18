@@ -1,0 +1,14 @@
+{
+    "recipient_name": "Lynnette Burgos",
+    "street_address": "26 BAIRD STREET",
+    "city": "Warminster",
+    "state": "PA",
+    "zip_code": "18974",
+    "tracking_number": "9261 2909 8586 6157 1676 1714 74",
+    "carrier": "USPS",
+    "parser_used": "deliver_to",
+    "parser_matches": [
+        "generic_city_state_zip",
+        "deliver_to"
+    ]
+}

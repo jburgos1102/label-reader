@@ -1,0 +1,13 @@
+{
+    "recipient_name": "ANDREW ZACCAGNINO",
+    "street_address": "DICKINSON COLLEGE 28 N COLLEGE",
+    "city": "Carlisle",
+    "state": "PA",
+    "zip_code": "17013-2311",
+    "tracking_number": "1Z09271R030504AAIK",
+    "carrier": "UPS",
+    "parser_used": "generic_city_state_zip",
+    "parser_matches": [
+        "generic_city_state_zip"
+    ]
+}
