@@ -28,7 +28,9 @@ def extract_tracking_number(image):
 
                 print("TRACKING CANDIDATE:", repr(candidate))
 
-                if len(candidate) >= min_tracking_length:
+                candidate = clean_tracking_candidate(candidate)
+
+                if is_valid_tracking_candidate(candidate):
                     return candidate
 
     return ""
@@ -112,6 +114,86 @@ def identify_carrier(tracking_number):
         return "UPS"
 
     return "Unknown"
+
+
+# --- TRACKING HELPER FUNCTIONS ---
+
+
+def clean_tracking_candidate(candidate):
+    candidate = candidate.upper()
+    candidate = re.sub(r"[^A-Z0-9]", "", candidate)
+
+    if candidate.startswith("1BA"):
+        candidate = "TBA" + candidate[3:]
+
+    if candidate.startswith("1LSDO"):
+        candidate = candidate.replace("O", "0", 1)
+
+    return candidate
+
+
+def is_valid_tracking_candidate(candidate):
+    if not candidate:
+        return False
+
+    candidate = clean_tracking_candidate(candidate)
+
+    if len(candidate) < 15:
+        return False
+
+    if candidate.startswith(("HTTP", "AMZNTO", "WWW")):
+        return False
+
+    if candidate.startswith(("TBA", "YWNJC", "UUS", "DDIYS", "1LSD", "1Z")):
+        return True
+
+    if candidate.startswith(("91", "92", "93", "94", "95")) and len(candidate) >= 20:
+        return True
+
+    if candidate.startswith("56") and len(candidate) >= 20:
+        return True
+
+    return False
+
+
+def extract_tracking_from_ocr_lines(lines):
+    for line_index, line in enumerate(lines):
+        upper_line = line.upper()
+
+        if "TRACKING" not in upper_line:
+            continue
+
+        candidate_text = line
+
+        if line_index + 1 < len(lines):
+            candidate_text += " " + lines[line_index + 1]
+
+        if line_index + 2 < len(lines):
+            candidate_text += " " + lines[line_index + 2]
+
+        ups_match = re.search(r"1Z[\sA-Z0-9]{10,30}", candidate_text, re.IGNORECASE)
+
+        if ups_match:
+            candidate = clean_tracking_candidate(ups_match.group())
+
+            if is_valid_tracking_candidate(candidate):
+                return candidate
+
+        numeric_matches = re.findall(r"(?:\d[\s_\-]*){18,34}", candidate_text)
+
+        for numeric_match in numeric_matches:
+            candidate = clean_tracking_candidate(numeric_match)
+
+            if is_valid_tracking_candidate(candidate):
+                return candidate
+
+    for line in lines:
+        candidate = clean_tracking_candidate(line)
+
+        if is_valid_tracking_candidate(candidate):
+            return candidate
+
+    return ""
 
 
 # --- NORMALIZATION FUNCTION ---
@@ -284,24 +366,18 @@ def extract_label_data(image_path):
     for line_index, line in enumerate(lines):
         print(line_index, repr(line))
 
-    if not label_data["tracking_number"]:
-        for line in lines:
-            clean_tracking_line = line.replace("|", "").strip()
-            tracking_match = re.fullmatch(r"[A-Z0-9]{14,20}", clean_tracking_line)
+    ocr_tracking_candidate = extract_tracking_from_ocr_lines(lines)
 
-            if tracking_match:
-                tracking_candidate = tracking_match.group()
+    if ocr_tracking_candidate:
+        print("OCR TRACKING CANDIDATE:", repr(ocr_tracking_candidate))
 
-                if tracking_candidate.startswith("1BA"):
-                    tracking_candidate = "TBA" + tracking_candidate[3:]
-
-                print("OCR TRACKING CANDIDATE:", repr(tracking_candidate))
-
-                label_data["tracking_number"] = tracking_candidate
-
-                label_data["carrier"] = identify_carrier(tracking_candidate)
-
-                break
+        if (
+            not label_data["tracking_number"]
+            or identify_carrier(label_data["tracking_number"]) == "Unknown"
+            or "TRACKING" in text.upper()
+        ):
+            label_data["tracking_number"] = ocr_tracking_candidate
+            label_data["carrier"] = identify_carrier(ocr_tracking_candidate)
 
     used_deliver_to_block = False
 
