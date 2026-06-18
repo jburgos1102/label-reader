@@ -33,6 +33,14 @@ def extract_tracking_number(image):
                 if is_valid_tracking_candidate(candidate):
                     return candidate
 
+                barcode_digits = re.sub(r"\D", "", barcode_data)
+
+                if len(barcode_digits) > 22:
+                    fedex_candidate = barcode_digits[-12:]
+
+                    if is_valid_tracking_candidate(fedex_candidate):
+                        return fedex_candidate
+
     return ""
 
 
@@ -104,14 +112,25 @@ def identify_carrier(tracking_number):
     if tracking_number.startswith("1LSD"):
         return "TikTok"
 
-    if tracking_number.startswith(("92", "93", "94", "95")):
+    if (
+        tracking_number.isdigit()
+        and tracking_number.startswith(("91", "92", "93", "94", "95"))
+        and len(tracking_number) >= 20
+    ):
         return "USPS"
 
-    if tracking_number.startswith("56") and len(tracking_number) >= 20:
+    if (
+        tracking_number.isdigit()
+        and tracking_number.startswith("56")
+        and len(tracking_number) >= 20
+    ):
         return "USPS"
 
-    if tracking_number.startswith("1Z"):
+    if re.fullmatch(r"1Z[A-Z0-9]{16}", tracking_number):
         return "UPS"
+
+    if tracking_number.isdigit() and len(tracking_number) in (12, 15, 20, 22):
+        return "FEDEX"
 
     return "Unknown"
 
@@ -138,19 +157,29 @@ def is_valid_tracking_candidate(candidate):
 
     candidate = clean_tracking_candidate(candidate)
 
-    if len(candidate) < 15:
+    if len(candidate) < 12:
         return False
 
     if candidate.startswith(("HTTP", "AMZNTO", "WWW")):
         return False
 
-    if candidate.startswith(("TBA", "YWNJC", "UUS", "DDIYS", "1LSD", "1Z")):
+    if candidate.startswith(("TBA", "YWNJC", "UUS", "DDIYS", "1LSD")):
         return True
 
-    if candidate.startswith(("91", "92", "93", "94", "95")) and len(candidate) >= 20:
+    if re.fullmatch(r"1Z[A-Z0-9]{16}", candidate):
         return True
 
-    if candidate.startswith("56") and len(candidate) >= 20:
+    if (
+        candidate.isdigit()
+        and candidate.startswith(("91", "92", "93", "94", "95"))
+        and len(candidate) >= 20
+    ):
+        return True
+
+    if candidate.isdigit() and candidate.startswith("56") and len(candidate) >= 20:
+        return True
+
+    if candidate.isdigit() and len(candidate) in (12, 15, 20, 22):
         return True
 
     return False
@@ -171,7 +200,11 @@ def extract_tracking_from_ocr_lines(lines):
         if line_index + 2 < len(lines):
             candidate_text += " " + lines[line_index + 2]
 
-        ups_match = re.search(r"1Z[\sA-Z0-9]{10,30}", candidate_text, re.IGNORECASE)
+        ups_match = re.search(
+            r"1Z(?:[\s_-]*[A-Z0-9]){16}",
+            candidate_text,
+            re.IGNORECASE,
+        )
 
         if ups_match:
             candidate = clean_tracking_candidate(ups_match.group())
@@ -184,13 +217,19 @@ def extract_tracking_from_ocr_lines(lines):
         for numeric_match in numeric_matches:
             candidate = clean_tracking_candidate(numeric_match)
 
-            if is_valid_tracking_candidate(candidate):
+            if (
+                is_valid_tracking_candidate(candidate)
+                and identify_carrier(candidate) != "FEDEX"
+            ):
                 return candidate
 
     for line in lines:
         candidate = clean_tracking_candidate(line)
 
-        if is_valid_tracking_candidate(candidate):
+        if (
+            is_valid_tracking_candidate(candidate)
+            and identify_carrier(candidate) != "FEDEX"
+        ):
             return candidate
 
     return ""
