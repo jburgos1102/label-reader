@@ -201,6 +201,38 @@ def is_valid_usps_tracking_candidate(candidate):
     return False
 
 
+def is_valid_usps_ocr_tracking_candidate(candidate):
+    candidate = clean_tracking_candidate(candidate)
+
+    if (
+        candidate.isdigit()
+        and candidate.startswith(("91", "92", "93", "94", "95"))
+        and len(candidate) in (22, 26, 34)
+    ):
+        return True
+
+    if (
+        candidate.isdigit()
+        and candidate.startswith("56")
+        and len(candidate) in (22, 26, 34)
+    ):
+        return True
+
+    return False
+
+
+def extract_usps_tracking_candidates_from_text(text):
+    candidates = []
+
+    for numeric_match in re.findall(r"(?:\d[\s_\-]*){18,34}", text):
+        candidate = clean_tracking_candidate(numeric_match)
+
+        if is_valid_usps_ocr_tracking_candidate(candidate):
+            candidates.append(candidate)
+
+    return candidates
+
+
 def extract_tracking_from_ocr_lines(lines):
     for line_index, line in enumerate(lines):
         upper_line = line.upper()
@@ -208,17 +240,20 @@ def extract_tracking_from_ocr_lines(lines):
         if "USPS" not in upper_line or "TRACKING" not in upper_line:
             continue
 
+        nearby_lines = lines[line_index + 1 : min(line_index + 6, len(lines))]
+
+        # Prefer a valid USPS number on one OCR line before combining nearby
+        # lines, so trailing noise like "0 0000000" is not appended.
+        for nearby_line in nearby_lines:
+            for candidate in extract_usps_tracking_candidates_from_text(nearby_line):
+                return candidate
+
         candidate_text = line
 
-        for nearby_index in range(line_index + 1, min(line_index + 6, len(lines))):
-            candidate_text += " " + lines[nearby_index]
+        for nearby_line in nearby_lines:
+            candidate_text += " " + nearby_line
 
-        numeric_matches = re.findall(r"(?:\d[\s_\-]*){18,34}", candidate_text)
-
-        for numeric_match in numeric_matches:
-            candidate = clean_tracking_candidate(numeric_match)
-
-            if is_valid_usps_tracking_candidate(candidate):
+            for candidate in extract_usps_tracking_candidates_from_text(candidate_text):
                 return candidate
 
     for line_index, line in enumerate(lines):
