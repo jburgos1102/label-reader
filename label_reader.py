@@ -3,7 +3,6 @@ import re
 from address import (
     choose_recipient_from_lines,
     clean_address_ocr,
-    clean_address_service_text,
     clean_parser_name,
     is_deliver_to_marker,
     is_noise_recipient_line,
@@ -11,13 +10,7 @@ from address import (
 )
 from barcodes import extract_tracking_number
 from ocr import get_best_ocr_text
-from tracking import (
-    extract_usps_tracking_candidates_from_text,
-    extract_tracking_from_ocr_lines,
-    identify_carrier,
-    is_valid_usps_ocr_tracking_candidate,
-    is_valid_usps_tracking_candidate,
-)
+from tracking import extract_tracking_from_ocr_lines, identify_carrier
 
 
 # --- SCORING FUNCTION ---
@@ -144,8 +137,7 @@ def extract_label_data(image_path):
         print("OCR TRACKING CANDIDATE:", repr(ocr_tracking_candidate))
 
         has_usps_tracking_label = any(
-            "USPS" in line.upper() and "TRACKING" in line.upper()
-            for line in lines
+            "USPS" in line.upper() and "TRACKING" in line.upper() for line in lines
         )
         keep_usps_barcode_tracking = (
             has_usps_tracking_label
@@ -153,13 +145,10 @@ def extract_label_data(image_path):
             and identify_carrier(ocr_tracking_candidate) == "UPS"
         )
 
-        if (
-            not keep_usps_barcode_tracking
-            and (
-                not label_data["tracking_number"]
-                or identify_carrier(label_data["tracking_number"]) == "Unknown"
-                or "TRACKING" in text.upper()
-            )
+        if not keep_usps_barcode_tracking and (
+            not label_data["tracking_number"]
+            or identify_carrier(label_data["tracking_number"]) == "Unknown"
+            or "TRACKING" in text.upper()
         ):
             label_data["tracking_number"] = ocr_tracking_candidate
             label_data["carrier"] = identify_carrier(ocr_tracking_candidate)
@@ -303,13 +292,10 @@ def extract_label_data(image_path):
                     if nearby_index + 1 < len(lines):
                         possible_street = clean_address_ocr(lines[nearby_index + 1])
 
-                        if (
-                            re.search(r"\d", possible_street)
-                            and not re.search(
-                                r"\b(?:USPS\s+)?TRACKING\b",
-                                possible_street,
-                                re.IGNORECASE,
-                            )
+                        if re.search(r"\d", possible_street) and not re.search(
+                            r"\b(?:USPS\s+)?TRACKING\b",
+                            possible_street,
+                            re.IGNORECASE,
                         ):
                             label_data["recipient_name"] = ""
                             label_data["street_address"] = possible_street
@@ -440,7 +426,9 @@ def extract_label_data(image_path):
                 "COLLEGE MAILROOM CITY/STATE/ZIP MATCH:",
                 college_mailroom_match.groups(),
             )
-            print("COLLEGE MAILROOM CONTEXT:", college_city_match, college_context_match)
+            print(
+                "COLLEGE MAILROOM CONTEXT:", college_city_match, college_context_match
+            )
 
             if college_city_match or college_context_match:
                 address_end_index = line_index - 1
@@ -456,13 +444,9 @@ def extract_label_data(image_path):
                     previous_line = lines[address_start_index - 1]
                     previous_upper = previous_line.upper()
 
-                    if (
-                        any(
-                            keyword in previous_upper
-                            for keyword in mailroom_keywords
-                        )
-                        or re.search(r"\bP\.?\s*O\.?\s+BOX\b", previous_upper)
-                    ):
+                    if any(
+                        keyword in previous_upper for keyword in mailroom_keywords
+                    ) or re.search(r"\bP\.?\s*O\.?\s+BOX\b", previous_upper):
                         address_start_index -= 1
                     else:
                         break
