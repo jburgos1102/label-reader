@@ -5,6 +5,7 @@ from address import (
     clean_address_ocr,
     clean_address_service_text,
     clean_parser_name,
+    is_deliver_to_marker,
     is_noise_recipient_line,
     normalize_extracted_fields,
 )
@@ -166,7 +167,7 @@ def extract_label_data(image_path):
     used_deliver_to_block = False
 
     for line_index, line in enumerate(lines):
-        if "DELIVER TO" in line.upper():
+        if is_deliver_to_marker(line):
 
             if "USPS" not in line.upper():
                 print(f"\nFOUND NON-USPS DELIVER TO AT LINE {line_index}")
@@ -218,27 +219,54 @@ def extract_label_data(image_path):
                 deliver_to_city_line = lines[line_index + 3]
                 deliver_to_name = clean_parser_name(deliver_to_name)
                 deliver_to_street = clean_address_ocr(deliver_to_street)
+                deliver_to_city_line = clean_address_ocr(deliver_to_city_line)
 
                 print("DELIVER TO NAME:", repr(deliver_to_name))
                 print("DELIVER TO STREET:", repr(deliver_to_street))
                 print("DELIVER TO CITY LINE:", repr(deliver_to_city_line))
 
-                deliver_to_city_parts = deliver_to_city_line.split()
+                deliver_to_city_parts = [
+                    part.strip(",")
+                    for part in deliver_to_city_line.split()
+                    if part.strip(",")
+                ]
 
                 print("DELIVER TO CITY PARTS:", deliver_to_city_parts)
 
-                if len(deliver_to_city_parts) >= 3:
+                if len(deliver_to_city_parts) >= 2:
                     state_candidate = deliver_to_city_parts[-2]
                     zip_candidate = deliver_to_city_parts[-1]
 
                     state_match = re.fullmatch(r"[A-Z]{2}", state_candidate)
                     zip_match = re.fullmatch(r"\d{5}", zip_candidate)
 
+                    if not (state_match and zip_match):
+                        state_candidate = deliver_to_city_parts[-1]
+                        zip_candidate = ""
+                        state_match = re.fullmatch(r"[A-Z]{2}", state_candidate)
+
+                        for previous_line in lines[max(0, line_index - 8) : line_index]:
+                            previous_zip_match = re.search(
+                                r"\bSHIP\s+USPS\s+(\d{5})\b",
+                                previous_line,
+                                re.IGNORECASE,
+                            )
+
+                            if previous_zip_match:
+                                zip_candidate = previous_zip_match.group(1)
+                                break
+
+                        zip_match = re.fullmatch(r"\d{5}", zip_candidate)
+
                     print("STATE MATCH:", bool(state_match))
                     print("ZIP MATCH:", bool(zip_match))
 
                     if state_match and zip_match:
-                        deliver_to_city = " ".join(deliver_to_city_parts[:-2])
+                        if deliver_to_city_parts[-1] == zip_candidate:
+                            deliver_to_city = " ".join(deliver_to_city_parts[:-2])
+                        else:
+                            deliver_to_city = " ".join(deliver_to_city_parts[:-1])
+
                         deliver_to_city = deliver_to_city.strip(",")
 
                         label_data["recipient_name"] = deliver_to_name
@@ -256,6 +284,52 @@ def extract_label_data(image_path):
             continue
 
         parts = line.split()
+
+        city_first_match = re.fullmatch(
+            r"([A-Za-z][A-Za-z .'-]*?),?\s+([A-Z]{2})\s+(\d{5}(?:\s*[-–—]\s*\d{4})?)",
+            clean_address_ocr(line),
+        )
+
+        if city_first_match and line_index == 0:
+            for nearby_index in range(line_index + 1, min(line_index + 12, len(lines))):
+                if re.search(
+                    r"\b(?:USPS\s+)?TRACKING\b",
+                    lines[nearby_index],
+                    re.IGNORECASE,
+                ):
+                    break
+
+                if re.match(r"^\s*TO\b", lines[nearby_index], re.IGNORECASE):
+                    if nearby_index + 1 < len(lines):
+                        possible_street = clean_address_ocr(lines[nearby_index + 1])
+
+                        if (
+                            re.search(r"\d", possible_street)
+                            and not re.search(
+                                r"\b(?:USPS\s+)?TRACKING\b",
+                                possible_street,
+                                re.IGNORECASE,
+                            )
+                        ):
+                            label_data["recipient_name"] = ""
+                            label_data["street_address"] = possible_street
+                            label_data["city"] = city_first_match.group(1).strip(",")
+                            label_data["state"] = city_first_match.group(2)
+                            label_data["zip_code"] = re.sub(
+                                r"\s*[-–—]\s*",
+                                "-",
+                                city_first_match.group(3),
+                            )
+                            label_data["parser_used"] = "city_first_to_address"
+                            if (
+                                "city_first_to_address"
+                                not in label_data["parser_matches"]
+                            ):
+                                label_data["parser_matches"].append(
+                                    "city_first_to_address"
+                                )
+
+                            break
 
         if "18974" in line:
             print("ZIP-FIRST PARTS:", parts)
@@ -465,7 +539,7 @@ def extract_label_data(image_path):
 
                 zip_match = re.fullmatch(r"(\d{5})[-–—]?(\d{4})?", zip_part)
 
-                if zip_match:
+                if zip_match and line_index >= 2:
                     zip_code = zip_match.group(1)
                     zip_plus_four = zip_match.group(2)
 

@@ -17,12 +17,30 @@ def clean_address_ocr(value):
     value = clean_address_service_text(value)
     value = re.sub(r"(?<=\d)@(?=\d)", "0", value)
     value = re.sub(r"\b1@5\b", "105", value, flags=re.IGNORECASE)
+    value = re.sub(r"\bNL\b", "L", value, flags=re.IGNORECASE)
     value = re.sub(r"\bAUB\b", "HUB", value, flags=re.IGNORECASE)
     value = re.sub(r"\bPRRLISLE\b", "CARLISLE", value, flags=re.IGNORECASE)
-    value = re.sub(r"\b\\?IVERSITY\b", "UNIVERSITY", value, flags=re.IGNORECASE)
+    value = re.sub(
+        r"(?<![A-Za-z])\\?IVERSITY\b",
+        "UNIVERSITY",
+        value,
+        flags=re.IGNORECASE,
+    )
     value = re.sub(r"\s+", " ", value)
 
     return value.strip()
+
+
+def is_deliver_to_marker(line):
+    clean_line = clean_address_ocr(line).upper()
+    clean_line = re.sub(r"[^A-Z\s]", " ", clean_line)
+    clean_line = re.sub(r"\s+", " ", clean_line).strip()
+
+    return bool(
+        re.search(r"\bDELIVER\s+TO\b", clean_line)
+        or re.search(r"\bVER\s+TO\b", clean_line)
+        or re.search(r"\bUSPS\b.*\bTO\b", clean_line)
+    )
 
 
 def clean_parser_name(value):
