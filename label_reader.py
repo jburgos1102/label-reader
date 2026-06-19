@@ -1,6 +1,5 @@
 from PIL import Image
 from pyzbar.pyzbar import decode
-import pytesseract
 import re
 from address import (
     choose_recipient_from_lines,
@@ -10,6 +9,7 @@ from address import (
     is_noise_recipient_line,
     normalize_extracted_fields,
 )
+from ocr import get_best_ocr_text
 from tracking import (
     clean_tracking_candidate,
     extract_usps_tracking_candidates_from_text,
@@ -59,55 +59,6 @@ def extract_tracking_number(image):
                         return fedex_candidate
 
     return ""
-
-
-def get_best_ocr_text(image):
-    rotations = [0, 90, 180, 270]
-
-    best_text = ""
-    best_score = -1
-
-    for degrees in rotations:
-        rotated_image = image.rotate(degrees, expand=True)
-        text = pytesseract.image_to_string(rotated_image)
-
-        score = 0
-
-        upper_text = text.upper()
-
-        if "DELIVER TO" in upper_text:
-            score += 5
-
-        if "WARMINSTER" in upper_text:
-            score += 3
-
-        if "BAIRD" in upper_text:
-            score += 3
-
-        if "UNIUNI" in upper_text:
-            score += 2
-
-        if re.search(r"\b[A-Z]{2}\s+\d{5}", text):
-            score += 5
-
-        if re.search(r"\b[A-Z]{2}\s+\d{5}[-–— ]?\d{4}", text):
-            score += 5
-
-        if "TRACKING" in upper_text:
-            score += 2
-
-        if "USPS" in upper_text:
-            score += 1
-
-        print(f"OCR ROTATION {degrees} SCORE:", score)
-        print(text[:200])
-        print("---")
-
-        if score > best_score:
-            best_score = score
-            best_text = text
-
-    return best_text
 
 
 # --- SCORING FUNCTION ---
