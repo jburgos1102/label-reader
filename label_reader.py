@@ -7,6 +7,7 @@ from address import (
     is_deliver_to_marker,
     is_noise_recipient_line,
     normalize_extracted_fields,
+    split_ship_recipient_and_hub,
 )
 from barcodes import extract_tracking_number
 from ocr import get_best_ocr_text
@@ -460,19 +461,42 @@ def extract_label_data(image_path):
                 )
 
                 first_address_line = address_lines[0] if address_lines else ""
-                ship_name_address_match = re.match(
-                    r"^\s*SHIP\s+(.+?)\s+(HUB\b.*)$",
-                    first_address_line,
-                    re.IGNORECASE,
+                ship_recipient_name, ship_hub_part = split_ship_recipient_and_hub(
+                    first_address_line
                 )
+                drop_split_ship_hub = False
 
-                if ship_name_address_match:
-                    recipient_name = ship_name_address_match.group(1).strip()
-                    address_lines[0] = ship_name_address_match.group(2).strip()
+                if ship_recipient_name:
+                    recipient_name = ship_recipient_name
+
+                    has_dickinson_address_line = any(
+                        re.search(
+                            r"\bDICKINSON\s+COLLEGE\b.*\bN\s+COLLEGE\b",
+                            address_line,
+                            re.IGNORECASE,
+                        )
+                        for address_line in address_lines[1:]
+                    )
+
+                    if has_dickinson_address_line:
+                        address_lines = address_lines[1:]
+                        drop_split_ship_hub = True
+                    else:
+                        address_lines[0] = ship_hub_part
 
                 clean_address_lines = []
 
                 for address_line in address_lines:
+                    if (
+                        drop_split_ship_hub
+                        and re.fullmatch(
+                            r"\s*TO\s*:\s*ST\s*",
+                            address_line,
+                            flags=re.IGNORECASE,
+                        )
+                    ):
+                        continue
+
                     address_line = re.sub(
                         r"^\s*(?:TO|SHIP)\s*:\s*",
                         "",

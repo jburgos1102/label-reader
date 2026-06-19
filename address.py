@@ -43,6 +43,19 @@ def is_deliver_to_marker(line):
     )
 
 
+def split_ship_recipient_and_hub(line):
+    match = re.match(
+        r"^\s*SHIP\s+(.+?)\s+(HUB\b.*)$",
+        line,
+        flags=re.IGNORECASE,
+    )
+
+    if not match:
+        return "", ""
+
+    return match.group(1).strip(), match.group(2).strip()
+
+
 def clean_parser_name(value):
     value = re.sub(r"^\s*(?:TO|SHIP)\s*:?\s*", "", value, flags=re.IGNORECASE)
     value = re.sub(r"\s+", " ", value)
