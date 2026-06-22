@@ -1,10 +1,12 @@
 from collections import deque
 from datetime import datetime
 from pathlib import Path
+import json
 import time
 
 import cv2
 import numpy as np
+from label_reader import extract_label_data
 
 
 def find_label_contour(frame):
@@ -158,6 +160,17 @@ def main():
 
                         if crop_saved:
                             print(f"Captured cropped label: {crop_path}")
+                            try:
+                                extraction_result = extract_label_data(str(crop_path))
+                                print("\n============================")
+                                print("Captured Label Extraction")
+                                print("============================")
+                                print(json.dumps(extraction_result, indent=2))
+                            except Exception as error:
+                                print(
+                                    "Unable to extract data from the captured label; "
+                                    f"saved images were kept: {error}"
+                                )
                         else:
                             print(f"Unable to save cropped label: {crop_path}")
                     except (ValueError, cv2.error) as error:
