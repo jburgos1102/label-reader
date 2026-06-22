@@ -100,6 +100,26 @@ def crop_label(frame, contour):
     return cv2.warpPerspective(frame, transform, (crop_width, crop_height))
 
 
+def enhance_label_image(cropped_label):
+    if cropped_label is None or cropped_label.size == 0:
+        raise ValueError("The cropped label image is empty.")
+
+    grayscale = cv2.cvtColor(cropped_label, cv2.COLOR_BGR2GRAY)
+    upscaled = cv2.resize(
+        grayscale,
+        None,
+        fx=2,
+        fy=2,
+        interpolation=cv2.INTER_CUBIC,
+    )
+    contrast_enhancer = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    contrast_enhanced = contrast_enhancer.apply(upscaled)
+    softened = cv2.GaussianBlur(contrast_enhanced, (0, 0), 1.0)
+
+    # Mild unsharp masking improves text edges without binarizing barcodes.
+    return cv2.addWeighted(contrast_enhanced, 1.4, softened, -0.4, 0)
+
+
 def main():
     capture_directory = Path("captures")
     capture_directory.mkdir(exist_ok=True)
@@ -145,6 +165,9 @@ def main():
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     capture_path = capture_directory / f"captured_label_{timestamp}.jpg"
                     crop_path = capture_directory / f"cropped_label_{timestamp}.jpg"
+                    enhanced_path = (
+                        capture_directory / f"enhanced_label_{timestamp}.jpg"
+                    )
                     capture_saved = cv2.imwrite(str(capture_path), clean_frame)
                     capture_locked = True
 
@@ -160,8 +183,41 @@ def main():
 
                         if crop_saved:
                             print(f"Captured cropped label: {crop_path}")
+
+                            extraction_path = crop_path
+                            extraction_source = "raw cropped image"
+
                             try:
-                                extraction_result = extract_label_data(str(crop_path))
+                                enhanced_label = enhance_label_image(cropped_label)
+                                enhanced_saved = cv2.imwrite(
+                                    str(enhanced_path),
+                                    enhanced_label,
+                                )
+
+                                if enhanced_saved:
+                                    print(f"Captured enhanced label: {enhanced_path}")
+                                    extraction_path = enhanced_path
+                                    extraction_source = "enhanced image"
+                                else:
+                                    print(
+                                        f"Unable to save enhanced label: {enhanced_path}. "
+                                        f"Falling back to raw crop: {crop_path}"
+                                    )
+                            except Exception as error:
+                                print(
+                                    "Unable to enhance the cropped label at "
+                                    f"{enhanced_path}; falling back to raw crop "
+                                    f"{crop_path}: {error}"
+                                )
+
+                            print(
+                                f"Extraction using {extraction_source}: "
+                                f"{extraction_path}"
+                            )
+                            try:
+                                extraction_result = extract_label_data(
+                                    str(extraction_path)
+                                )
                                 print("\n============================")
                                 print("Captured Label Extraction")
                                 print("============================")
