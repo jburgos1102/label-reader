@@ -1,5 +1,12 @@
 import json
+import os
 from pathlib import Path
+
+
+EVALUATE_LLM = os.getenv("EVALUATE_LLM", "").strip().lower() == "true"
+
+if not EVALUATE_LLM:
+    os.environ["OPENAI_API_KEY"] = ""
 
 from label_reader import extract_label_data
 
@@ -60,8 +67,13 @@ def main():
 
     field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
+    llm_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
+    llm_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
     labels_tested = 0
+    llm_labels_scored = 0
+    llm_labels_skipped = 0
     failures = []
+    llm_failures = []
 
     for expected_path in expected_files:
         image_path = find_image_for_expected(expected_path)
@@ -105,9 +117,35 @@ def main():
                     f"actual={actual_data.get(field, '')!r}"
                 )
 
-    print("\n============================")
-    print("Evaluation Summary")
-    print("============================")
+        if not EVALUATE_LLM:
+            continue
+
+        llm_result = actual_data.get("llm_result")
+        if not isinstance(llm_result, dict) or not llm_result.get("llm_enabled"):
+            llm_labels_skipped += 1
+            continue
+
+        llm_labels_scored += 1
+
+        for field in FIELDS_TO_COMPARE:
+            llm_field_totals[field] += 1
+            passed = compare_field(llm_result, expected_data, field)
+
+            if passed:
+                llm_field_passes[field] += 1
+            else:
+                llm_failures.append(
+                    {
+                        "label": str(image_path),
+                        "field": field,
+                        "expected": expected_data.get(field, ""),
+                        "actual": llm_result.get(field, ""),
+                    }
+                )
+
+    print("\n=================================")
+    print("RULE-BASED RESULTS")
+    print("=================================")
     print(f"Labels tested: {labels_tested}")
 
     for field in FIELDS_TO_COMPARE:
@@ -128,6 +166,38 @@ def main():
             )
     else:
         print("\nAll fields matched expected values.")
+
+    print("\n=================================")
+    print("OPENAI RESULTS")
+    print("=================================")
+
+    if not EVALUATE_LLM:
+        print("OpenAI scoring skipped. Set EVALUATE_LLM=true to enable it.")
+        return
+
+    print(f"Labels scored: {llm_labels_scored}")
+    print(f"Labels skipped: {llm_labels_skipped}")
+
+    for field in FIELDS_TO_COMPARE:
+        total = llm_field_totals[field]
+        passed = llm_field_passes[field]
+        accuracy = (passed / total * 100) if total else 0
+
+        readable_name = field.replace("_", " ").title()
+        print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
+
+    if llm_failures:
+        print("\nFailures:")
+
+        for failure in llm_failures:
+            print(
+                f"- {failure['label']} | {failure['field']} | "
+                f"expected={failure['expected']!r} | actual={failure['actual']!r}"
+            )
+    elif llm_labels_scored:
+        print("\nAll fields matched expected values.")
+    else:
+        print("\nNo enabled OpenAI results were available to score.")
 
 
 if __name__ == "__main__":
