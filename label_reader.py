@@ -10,6 +10,7 @@ from address import (
     split_ship_recipient_and_hub,
 )
 from barcodes import extract_tracking_number
+from llm_extractor import extract_fields_with_llm
 from ocr import get_best_ocr_text
 from tracking import extract_tracking_from_ocr_lines, identify_carrier
 
@@ -621,6 +622,24 @@ def extract_label_data(image_path):
     label_data = normalize_extracted_fields(label_data)
     label_data["carrier"] = identify_carrier(label_data["tracking_number"])
     label_data = score_label_data(label_data)
+
+    try:
+        llm_result = extract_fields_with_llm(text, label_data)
+    except Exception:
+        llm_result = {
+            "recipient_name": label_data.get("recipient_name", ""),
+            "street_address": label_data.get("street_address", ""),
+            "city": label_data.get("city", ""),
+            "state": label_data.get("state", ""),
+            "zip_code": label_data.get("zip_code", ""),
+            "tracking_number": label_data.get("tracking_number", ""),
+            "carrier": label_data.get("carrier", ""),
+            "llm_enabled": False,
+            "llm_provider": "openai",
+            "llm_notes": "OpenAI extraction failed; using the rule-based result.",
+        }
+
+    label_data["llm_result"] = llm_result
 
     return label_data
 
