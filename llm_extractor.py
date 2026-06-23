@@ -73,12 +73,30 @@ def extract_fields_with_llm(text: str, rule_result: dict[str, Any]) -> dict[str,
         response = client.responses.create(
             model="gpt-5",
             instructions=(
-                "Extract the recipient shipping fields from the supplied OCR text. "
-                "Use only evidence present in the OCR text. Do not infer missing values. "
-                "Return an empty string for every field that cannot be determined. "
+                "Extract recipient shipping fields from the supplied OCR text, correcting "
+                "only obvious OCR spacing and label-noise errors. OCR may drop the first "
+                "letter of a label marker: for example, treat HIP as SHIP only when its "
+                "position and context show that it is a marker, and never include SHIP or "
+                "HIP in the recipient name. Remove label markers and promotional text such "
+                "as SHIP, TO, TRACKING, UPS GROUND, USPS TRACKING, DO NOT MISS OUT, and "
+                "amzn.to/social from extracted field values. Normalize obvious street "
+                "spacing, such as 28N COLLEGE ST to 28 N COLLEGE ST. Remove trailing OCR "
+                "junk from tracking numbers, such as SS when it is not part of a valid UPS "
+                "tracking number. When preferred_tracking_number is non-empty, treat it as "
+                "trusted barcode/rule-based evidence and use it instead of a conflicting "
+                "OCR tracking candidate. Do not invent missing values; return an empty "
+                "string for every field that cannot be determined. "
                 "Return strict JSON matching the provided schema and no other content."
             ),
-            input=ocr_text,
+            input=json.dumps(
+                {
+                    "ocr_text": ocr_text,
+                    "preferred_tracking_number": str(
+                        (rule_result or {}).get("tracking_number") or ""
+                    ).strip(),
+                },
+                ensure_ascii=False,
+            ),
             text={
                 "format": {
                     "type": "json_schema",
