@@ -80,7 +80,20 @@ def normalize_street_address(value):
     for suffix, abbreviation in STREET_SUFFIXES.items():
         normalized = re.sub(rf"\b{suffix}\b", abbreviation, normalized)
 
-    return " ".join(normalized.split())
+    normalized = re.sub(r"\bHUB(?:\s+BOX)?\s*#?\s*\d+\b", " ", normalized)
+    normalized = re.sub(r"\bPO\s+BOX\s+\d+\b", " ", normalized)
+    normalized = re.sub(r"\bDICKINSON\s+COLLEGE\b", " ", normalized)
+    normalized = re.sub(r"\b(?:DEPT|DEPARTMENT)(?:\s+OF)?\b.*$", " ", normalized)
+    normalized = " ".join(normalized.split())
+
+    street_start = re.search(
+        r"(?<![A-Z0-9])(?:\d+[A-Z]*(?:-[A-Z0-9]+)?|[A-Z]\d+[A-Z0-9-]*)(?=\s|$)",
+        normalized,
+    )
+    if not street_start:
+        return ""
+
+    return normalized[street_start.start() :]
 
 
 def normalize_name_tokens(value):
@@ -100,13 +113,19 @@ def normalize_name_tokens(value):
 
 
 def compare_street_address(actual_value, expected_value):
+    raw_actual = normalize_value(actual_value)
+    raw_expected = normalize_value(expected_value)
+
+    if any(
+        marker in raw_actual and marker not in raw_expected
+        for marker in SENDER_MARKERS
+    ):
+        return False
+
     actual = normalize_street_address(actual_value)
     expected = normalize_street_address(expected_value)
 
     if not actual or not expected:
-        return False
-
-    if any(marker in actual and marker not in expected for marker in SENDER_MARKERS):
         return False
 
     actual_numbers = re.findall(r"\d+", actual)
@@ -183,7 +202,13 @@ def load_expected_json(expected_path):
 
 def has_ground_truth(expected_data, field_name):
     value = expected_data.get(field_name)
-    return value is not None and bool(str(value).strip())
+    if value is None or not str(value).strip():
+        return False
+
+    if field_name == "street_address":
+        return bool(normalize_street_address(value))
+
+    return True
 
 
 def compare_field(actual_data, expected_data, field_name):
@@ -216,6 +241,15 @@ def main():
     field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
     llm_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     llm_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
+    hybrid_counts = {
+        field: {
+            "rule_only": 0,
+            "openai_only": 0,
+            "both_passed": 0,
+            "both_failed": 0,
+        }
+        for field in FIELDS_TO_COMPARE
+    }
     labels_tested = 0
     llm_labels_scored = 0
     llm_labels_skipped = 0
@@ -239,6 +273,7 @@ def main():
         expected_data = load_expected_json(expected_path)
         actual_data = extract_label_data(str(image_path))
         labels_tested += 1
+        rule_field_results = {}
 
         print(f"\nTesting: {image_path}")
 
@@ -248,6 +283,7 @@ def main():
 
             field_totals[field] += 1
             passed = compare_field(actual_data, expected_data, field)
+            rule_field_results[field] = passed
 
             if passed:
                 field_passes[field] += 1
@@ -283,6 +319,16 @@ def main():
 
             llm_field_totals[field] += 1
             passed = compare_field(llm_result, expected_data, field)
+            rule_passed = rule_field_results[field]
+
+            if rule_passed and passed:
+                hybrid_counts[field]["both_passed"] += 1
+            elif rule_passed:
+                hybrid_counts[field]["rule_only"] += 1
+            elif passed:
+                hybrid_counts[field]["openai_only"] += 1
+            else:
+                hybrid_counts[field]["both_failed"] += 1
 
             if passed:
                 llm_field_passes[field] += 1
@@ -351,6 +397,28 @@ def main():
         print("\nAll fields matched expected values.")
     else:
         print("\nNo enabled OpenAI results were available to score.")
+
+    print("\n=================================")
+    print("HYBRID FIELD COMPARISON")
+    print("=================================")
+
+    for field in FIELDS_TO_COMPARE:
+        counts = hybrid_counts[field]
+
+        if counts["openai_only"] > counts["rule_only"]:
+            suggested_source = "OpenAI"
+        elif counts["rule_only"] > counts["openai_only"]:
+            suggested_source = "Rule-Based"
+        else:
+            suggested_source = "Tie / Needs Review"
+
+        readable_name = field.replace("_", " ").title()
+        print(f"\n{readable_name}:")
+        print(f"  Rule only: {counts['rule_only']}")
+        print(f"  OpenAI only: {counts['openai_only']}")
+        print(f"  Both passed: {counts['both_passed']}")
+        print(f"  Both failed: {counts['both_failed']}")
+        print(f"  Suggested source: {suggested_source}")
 
 
 if __name__ == "__main__":
