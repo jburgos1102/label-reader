@@ -4,6 +4,7 @@ from address import (
     choose_recipient_from_lines,
     clean_address_ocr,
     clean_parser_name,
+    find_recipient_name_fallback,
     is_deliver_to_marker,
     is_noise_recipient_line,
     normalize_extracted_fields,
@@ -624,6 +625,11 @@ def extract_label_data(image_path):
                     label_data["parser_used"] = "generic_city_state_zip"
                     if "generic_city_state_zip" not in label_data["parser_matches"]:
                         label_data["parser_matches"].append("generic_city_state_zip")
+
+    if not label_data["recipient_name"]:
+        fallback_recipient = find_recipient_name_fallback(lines)
+        if fallback_recipient:
+            label_data["recipient_name"] = fallback_recipient
 
     label_data = normalize_extracted_fields(label_data)
     label_data["carrier"] = identify_carrier(label_data["tracking_number"])

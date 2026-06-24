@@ -153,6 +153,116 @@ def choose_recipient_from_lines(lines, start_index, min_index=0):
     return recipient_name
 
 
+def _is_likely_street_line(value):
+    clean_value = clean_address_ocr(value).upper()
+    return bool(
+        re.search(r"\d", clean_value)
+        and re.search(
+            r"\b(?:STREET|ST|ROAD|RD|AVENUE|AVE|BOULEVARD|BLVD|DRIVE|DR|"
+            r"LANE|LN|COURT|CT|WAY|BUILDING|BLDG|CENTER|HUB|P\.?\s*O\.?\s+BOX)\b",
+            clean_value,
+        )
+    )
+
+
+def _is_city_state_zip_line(value):
+    clean_value = clean_address_ocr(value).upper()
+    return bool(
+        re.search(r"\b[A-Z]{2}\s+\d{5}(?:-\d{4})?\b", clean_value)
+        or re.search(r"\bZIP\s*\d{5}\b", clean_value)
+    )
+
+
+def _is_recipient_marker(value):
+    clean_value = clean_address_ocr(value).upper()
+    return bool(
+        is_deliver_to_marker(value)
+        or re.fullmatch(r"\s*(?:TO|SHIP\s+TO)\s*:?[\s|]*", clean_value)
+    )
+
+
+def _recipient_name_shape(value):
+    name_word = r"[A-Za-z][A-Za-z'’-]*"
+    title = r"(?:MR|MRS|MS|MISS|DR)\."
+    comma_format = re.fullmatch(
+        rf"(?:{title}\s+)?{name_word},\s*{name_word}(?:\s+[A-Za-z])?",
+        value,
+        flags=re.IGNORECASE,
+    )
+    standard_format = re.fullmatch(
+        rf"(?:{title}\s+)?{name_word}(?:\s+{name_word}){{1,3}}",
+        value,
+        flags=re.IGNORECASE,
+    )
+    return comma_format, standard_format
+
+
+def find_recipient_name_fallback(lines):
+    """Find a conservative person-name candidate in OCR lines."""
+    rejected_words = re.compile(
+        r"\b(?:AMAZON|CARRIER|DELIVERY|DEPARTMENT|DEPT|DHL|FEDEX|GROUND|"
+        r"INSTAGRAM|LIGHTWEIGHT|MAIL|POSTAGE|PRIORITY|PROMO|QR|RETURN|SCAN|"
+        r"SERVICE|SERVICES|SOCIAL|SPEEDX|TRACKING|UNITED STATES|UPS|USPS|"
+        r"VISIT|COLLEGE|UNIVERSITY|FULFILLMENT|CURRENT OCCUPANT)\b",
+        flags=re.IGNORECASE,
+    )
+    candidates = []
+
+    for index, raw_line in enumerate(lines):
+        raw_line = raw_line.strip()
+        same_line_marker = bool(
+            re.match(r"^\s*(?:TO|SHIP\s+TO)\s*:", raw_line, re.I)
+        )
+        candidate = clean_parser_name(raw_line)
+
+        if not candidate or is_noise_recipient_line(candidate):
+            continue
+
+        if rejected_words.search(candidate) or re.search(r"\d", candidate):
+            continue
+
+        letters = sum(character.isalpha() for character in candidate)
+        visible = sum(not character.isspace() for character in candidate)
+        if not visible or letters / visible < 0.75:
+            continue
+
+        comma_format, standard_format = _recipient_name_shape(candidate)
+        if not (comma_format or standard_format):
+            continue
+
+        score = 1
+        if comma_format:
+            score += 3
+        if re.match(r"^(?:MR|MRS|MS|MISS|DR)\.", candidate, re.I):
+            score += 2
+        if same_line_marker:
+            score += 4
+        if any(
+            _is_recipient_marker(lines[nearby])
+            for nearby in range(max(0, index - 2), index)
+        ):
+            score += 4
+        if any(
+            _is_likely_street_line(lines[nearby])
+            for nearby in range(index + 1, min(len(lines), index + 3))
+        ):
+            score += 3
+        if any(
+            _is_city_state_zip_line(lines[nearby])
+            for nearby in range(index + 1, min(len(lines), index + 4))
+        ):
+            score += 2
+
+        if score >= 4:
+            candidates.append((score, index, candidate))
+
+    if not candidates:
+        return ""
+
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return candidates[0][2]
+
+
 # --- NORMALIZATION FUNCTION ---
 def normalize_extracted_fields(label_data):
     street_address = label_data.get("street_address", "")
