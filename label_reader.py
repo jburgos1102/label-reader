@@ -641,6 +641,23 @@ def extract_label_data(image_path):
 
     label_data["llm_result"] = llm_result
 
+    selected_fields = (
+        "recipient_name",
+        "street_address",
+        "city",
+        "state",
+        "zip_code",
+        "tracking_number",
+        "carrier",
+    )
+    selected_result = {
+        field: label_data.get(field, "") for field in selected_fields
+    }
+    selected_result["source"] = {
+        field: "rule_based" for field in selected_fields
+    }
+    label_data["selected_result"] = selected_result
+
     return label_data
 
 
