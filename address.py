@@ -1,6 +1,60 @@
 import re
 
 
+def clean_physical_street_ocr(value):
+    """Clean conservative OCR noise from a line that starts like an address."""
+    address_start = re.match(
+        r"^\s*[^A-Za-z0-9]*?(?:\d+[A-Z]?(?:-[A-Z0-9]+)?|[NSEW]\s*\d{2,4})\b",
+        value,
+        flags=re.IGNORECASE,
+    )
+    if not address_start:
+        return value
+
+    value = re.sub(r"^\s*[^A-Za-z0-9]+", "", value)
+    value = re.sub(r"^(\d+[A-Z]?)\s*[.,:]\s+", r"\1 ", value)
+    value = re.sub(
+        r"^([NSEW])\s+(\d{2,4})\b",
+        r"\1\2",
+        value,
+        flags=re.IGNORECASE,
+    )
+
+    # Section-sign-like OCR is a common damaged terminal "ST" glyph.
+    value = re.sub(r"\s+§\s*$", " ST", value)
+
+    suffix_matches = list(
+        re.finditer(
+            r"\b(?:STREET|ST|ROAD|RD|AVENUE|AVE|BOULEVARD|BLVD|DRIVE|DR|"
+            r"LANE|LN|COURT|CT|WAY)\b",
+            value,
+            flags=re.IGNORECASE,
+        )
+    )
+    if suffix_matches:
+        suffix_match = suffix_matches[-1]
+        trailing_text = value[suffix_match.end() :].strip()
+        keeps_delivery_detail = re.match(
+            r"^(?:(?:APT|APARTMENT|UNIT|SUITE|STE|HUB)\b|"
+            r"P\.?\s*O\.?\s+BOX\b|#)",
+            trailing_text,
+            flags=re.IGNORECASE,
+        )
+        trailing_words = re.findall(r"[A-Za-z]+", trailing_text)
+        obvious_trailing_noise = bool(
+            re.search(r"[;|%={}~]", trailing_text)
+            or (
+                trailing_words
+                and all(len(word) <= 2 for word in trailing_words)
+            )
+        )
+
+        if trailing_text and not keeps_delivery_detail and obvious_trailing_noise:
+            value = value[: suffix_match.end()]
+
+    return value
+
+
 def clean_address_service_text(value):
     value = re.sub(
         r"\b(?:CARRIER\s*[—-]\s*LEAVE IF NO RESPONSE|RETURN SERVICE REQUESTED|ADDRESS SERVICE REQUESTED|SERVICE REQUESTED)\b.*",
@@ -15,6 +69,7 @@ def clean_address_service_text(value):
 
 def clean_address_ocr(value):
     value = clean_address_service_text(value)
+    value = clean_physical_street_ocr(value)
     value = re.sub(r"(?<=\d)@(?=\d)", "0", value)
     value = re.sub(r"\b1@5\b", "105", value, flags=re.IGNORECASE)
     value = re.sub(r"\bNL\b", "L", value, flags=re.IGNORECASE)
