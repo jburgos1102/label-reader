@@ -15,6 +15,12 @@ from ocr import get_best_ocr_text
 from tracking import extract_tracking_from_ocr_lines, identify_carrier
 
 
+def normalize_comparison_value(value):
+    normalized = str(value or "").upper().strip()
+    normalized = re.sub(r"[^\w\s]", "", normalized)
+    return " ".join(normalized.split())
+
+
 # --- SCORING FUNCTION ---
 def score_label_data(label_data):
     confidence = {
@@ -657,6 +663,26 @@ def extract_label_data(image_path):
         field: "rule_based" for field in selected_fields
     }
     label_data["selected_result"] = selected_result
+
+    llm_available = isinstance(llm_result, dict) and bool(
+        llm_result.get("llm_enabled")
+    )
+    comparison = {}
+
+    for field in selected_fields:
+        rule_based_value = label_data.get(field, "")
+        openai_value = llm_result.get(field, "") if llm_available else ""
+        selected_value = selected_result.get(field, "")
+        comparison[field] = {
+            "rule_based": rule_based_value,
+            "openai": openai_value,
+            "selected": selected_value,
+            "agreement": llm_available
+            and normalize_comparison_value(rule_based_value)
+            == normalize_comparison_value(openai_value),
+        }
+
+    label_data["comparison"] = comparison
 
     return label_data
 
