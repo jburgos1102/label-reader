@@ -1,6 +1,18 @@
 import re
 
 
+OCR_LETTER_TO_DIGIT = str.maketrans(
+    {
+        "O": "0",
+        "I": "1",
+        "L": "1",
+        "S": "5",
+        "B": "8",
+        "G": "6",
+    }
+)
+
+
 # --- IDENTIFY CARRIER ---
 def identify_carrier(tracking_number):
     tracking_number = tracking_number.upper()
@@ -55,6 +67,58 @@ def clean_tracking_candidate(candidate):
 
     if candidate.startswith("1LSDO"):
         candidate = candidate.replace("O", "0", 1)
+
+    return candidate
+
+
+def is_valid_ups_check_digit(candidate):
+    if not re.fullmatch(r"1Z[A-Z0-9]{16}", candidate):
+        return False
+
+    body = candidate[2:-1]
+    check_digit = candidate[-1]
+    if not check_digit.isdigit():
+        return False
+
+    values = []
+    for character in body:
+        if character.isdigit():
+            values.append(int(character))
+        else:
+            values.append((ord(character) - 63) % 10)
+
+    weighted_sum = sum(
+        value * (1 if index % 2 == 0 else 2)
+        for index, value in enumerate(values)
+    )
+    expected_check_digit = (10 - weighted_sum % 10) % 10
+    return expected_check_digit == int(check_digit)
+
+
+def clean_ups_ocr_candidate(candidate):
+    candidate = clean_tracking_candidate(candidate)
+    if not re.fullmatch(r"1Z[A-Z0-9]{16}", candidate):
+        return candidate
+
+    if is_valid_ups_check_digit(candidate):
+        return candidate
+
+    corrected = candidate[:2] + candidate[2:].translate(OCR_LETTER_TO_DIGIT)
+    if corrected != candidate and is_valid_ups_check_digit(corrected):
+        return corrected
+
+    return candidate
+
+
+def clean_usps_ocr_candidate(candidate):
+    candidate = clean_tracking_candidate(candidate)
+    corrected = candidate.translate(OCR_LETTER_TO_DIGIT)
+
+    if (
+        corrected.isdigit()
+        and corrected.startswith(("91", "92", "93", "94", "95", "56"))
+    ):
+        return corrected
 
     return candidate
 
@@ -132,8 +196,12 @@ def is_valid_usps_ocr_tracking_candidate(candidate):
 def extract_usps_tracking_candidates_from_text(text):
     candidates = []
 
-    for numeric_match in re.findall(r"(?:\d[\s_\-]*){18,34}", text):
-        candidate = clean_tracking_candidate(numeric_match)
+    for numeric_match in re.findall(
+        r"(?:[0-9OILSBG][\s_\-]*){18,34}",
+        text,
+        flags=re.IGNORECASE,
+    ):
+        candidate = clean_usps_ocr_candidate(numeric_match)
 
         if is_valid_usps_ocr_tracking_candidate(candidate):
             candidates.append(candidate)
@@ -185,15 +253,19 @@ def extract_tracking_from_ocr_lines(lines):
         )
 
         if ups_match:
-            candidate = clean_tracking_candidate(ups_match.group())
+            candidate = clean_ups_ocr_candidate(ups_match.group())
 
             if is_valid_tracking_candidate(candidate):
                 return candidate
 
-        numeric_matches = re.findall(r"(?:\d[\s_\-]*){18,34}", candidate_text)
+        numeric_matches = re.findall(
+            r"(?:[0-9OILSBG][\s_\-]*){18,34}",
+            candidate_text,
+            flags=re.IGNORECASE,
+        )
 
         for numeric_match in numeric_matches:
-            candidate = clean_tracking_candidate(numeric_match)
+            candidate = clean_usps_ocr_candidate(numeric_match)
 
             if (
                 is_valid_tracking_candidate(candidate)
@@ -203,6 +275,11 @@ def extract_tracking_from_ocr_lines(lines):
 
     for line in lines:
         candidate = clean_tracking_candidate(line)
+
+        if candidate.startswith("1Z"):
+            candidate = clean_ups_ocr_candidate(candidate)
+        else:
+            candidate = clean_usps_ocr_candidate(candidate)
 
         if (
             is_valid_tracking_candidate(candidate)
