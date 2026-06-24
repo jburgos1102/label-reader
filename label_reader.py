@@ -8,6 +8,7 @@ from address import (
     is_deliver_to_marker,
     is_noise_recipient_line,
     normalize_extracted_fields,
+    recover_penn_state_address,
     reconstruct_college_mailroom_street,
     split_ship_recipient_and_hub,
 )
@@ -640,6 +641,14 @@ def extract_label_data(image_path):
         lines,
         label_data["street_address"],
     )
+    penn_state_address = recover_penn_state_address(
+        lines,
+        label_data["street_address"],
+        label_data["city"],
+        label_data["state"],
+        label_data["zip_code"],
+    )
+    label_data.update(penn_state_address)
 
     label_data = normalize_extracted_fields(label_data)
     label_data["carrier"] = identify_carrier_with_context(

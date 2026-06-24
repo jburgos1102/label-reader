@@ -115,6 +115,59 @@ def reconstruct_college_mailroom_street(lines, current_street):
     return current_street
 
 
+def recover_penn_state_address(
+    lines,
+    current_street,
+    current_city,
+    current_state,
+    current_zip,
+):
+    """Recover an explicit University Park campus address block from OCR."""
+    cleaned_lines = [clean_address_ocr(line) for line in lines]
+
+    for city_index, line in enumerate(cleaned_lines):
+        city_match = re.search(
+            r"\bUNIVERSITY\s+PARK\b[\s,]*PA\W*(16802)"
+            r"(?:\s*[-–—]\s*(\d{4}))?\b",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if not city_match:
+            continue
+
+        zip_code = city_match.group(1)
+        if city_match.group(2):
+            zip_code += "-" + city_match.group(2)
+
+        recovered = {
+            "street_address": current_street,
+            "city": "University Park",
+            "state": "PA",
+            "zip_code": zip_code,
+        }
+
+        for address_index in range(city_index - 1, max(-1, city_index - 5), -1):
+            address_line = cleaned_lines[address_index].strip()
+            building_match = re.fullmatch(
+                r"((?:\d+[A-Z]?(?:-[A-Z0-9]+)?|[NSEW]\d{2,4})\s+.+?"
+                r"\b(?:BLDG|BUILDING|CENTER|COMPLEX|PARK))",
+                address_line,
+                flags=re.IGNORECASE,
+            )
+            if building_match:
+                recovered["street_address"] = building_match.group(1)
+                break
+
+        return recovered
+
+    return {
+        "street_address": current_street,
+        "city": current_city,
+        "state": current_state,
+        "zip_code": current_zip,
+    }
+
+
 def clean_address_service_text(value):
     value = re.sub(
         r"\b(?:CARRIER\s*[—-]\s*LEAVE IF NO RESPONSE|RETURN SERVICE REQUESTED|ADDRESS SERVICE REQUESTED|SERVICE REQUESTED)\b.*",
