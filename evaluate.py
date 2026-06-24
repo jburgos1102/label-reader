@@ -96,6 +96,46 @@ def print_gold_metrics(field_totals, field_correct):
         print(f"{readable_name} Accuracy: {accuracy:.1f}% ({correct}/{total})")
 
 
+def print_failure_analysis(failures):
+    failures_by_field = {field: [] for field in FIELDS_TO_COMPARE}
+
+    for failure in failures:
+        field = failure.get("field")
+        if field in failures_by_field:
+            failures_by_field[field].append(failure)
+
+    ranked_fields = sorted(
+        FIELDS_TO_COMPARE,
+        key=lambda field: (
+            -len(failures_by_field[field]),
+            FIELDS_TO_COMPARE.index(field),
+        ),
+    )
+
+    print("\n=================================")
+    print("FAILURE ANALYSIS")
+    print("=================================")
+    print("Failure Counts By Field:")
+
+    for field in ranked_fields:
+        print(f"{field}: {len(failures_by_field[field])}")
+
+    print("\nTop Examples:")
+
+    for field in ranked_fields:
+        field_failures = failures_by_field[field]
+        if not field_failures:
+            continue
+
+        print(f"\n{field}:")
+        for failure in field_failures[:5]:
+            expected = json.dumps(failure.get("expected", ""), ensure_ascii=False)
+            actual = json.dumps(failure.get("actual", ""), ensure_ascii=False)
+            print(f"- {failure['label']}")
+            print(f"  expected: {expected}")
+            print(f"  actual: {actual}")
+
+
 def normalize_value(value):
     if value is None:
         return ""
@@ -419,6 +459,8 @@ def main():
             )
     else:
         print("\nAll fields matched expected values.")
+
+    print_failure_analysis(failures)
 
     print("\n=================================")
     print("OPENAI RESULTS")
