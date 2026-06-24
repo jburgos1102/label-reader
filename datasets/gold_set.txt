@@ -1,0 +1,6 @@
+datasets/ups/images/ups_002.jpeg
+datasets/usps/images/usps_015.jpeg
+datasets/usps/images/usps_020.jpeg
+datasets/speedx/images/speedx_001.JPG
+datasets/fedex/images/fedex_001.jpeg
+

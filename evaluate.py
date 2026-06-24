@@ -12,6 +12,7 @@ if not EVALUATE_LLM:
 from label_reader import extract_label_data
 
 DATASETS_DIR = Path("datasets")
+GOLD_SET_PATH = DATASETS_DIR / "gold_set.txt"
 FIELDS_TO_COMPARE = [
     "recipient_name",
     "street_address",
@@ -57,6 +58,42 @@ SENDER_MARKERS = (
     "SHIP FROM",
     "SENDER ADDRESS",
 )
+
+GOLD_FIELD_LABELS = {
+    "zip_code": "ZIP",
+    "tracking_number": "Tracking",
+}
+
+
+def normalize_image_path(image_path):
+    normalized = os.path.normpath(str(image_path).strip())
+    return Path(normalized).as_posix().casefold()
+
+
+def load_gold_set():
+    if not GOLD_SET_PATH.exists():
+        return set()
+
+    gold_paths = set()
+    with GOLD_SET_PATH.open("r", encoding="utf-8") as file:
+        for line in file:
+            candidate = line.strip()
+            if candidate and not candidate.startswith("#"):
+                gold_paths.add(normalize_image_path(candidate))
+
+    return gold_paths
+
+
+def print_gold_metrics(field_totals, field_correct):
+    for field in FIELDS_TO_COMPARE:
+        total = field_totals[field]
+        correct = field_correct[field]
+        accuracy = (correct / total * 100) if total else 0
+        readable_name = GOLD_FIELD_LABELS.get(
+            field,
+            field.replace("_", " ").title(),
+        )
+        print(f"{readable_name} Accuracy: {accuracy:.1f}% ({correct}/{total})")
 
 
 def normalize_value(value):
@@ -232,6 +269,8 @@ def compare_field(actual_data, expected_data, field_name):
 
 def main():
     expected_files = sorted(DATASETS_DIR.glob("*/expected/*.json"))
+    gold_set_configured = GOLD_SET_PATH.exists()
+    gold_set = load_gold_set()
 
     if not expected_files:
         print("No expected JSON files found.")
@@ -241,6 +280,10 @@ def main():
     field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
     llm_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     llm_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
+    gold_rule_totals = {field: 0 for field in FIELDS_TO_COMPARE}
+    gold_rule_correct = {field: 0 for field in FIELDS_TO_COMPARE}
+    gold_openai_totals = {field: 0 for field in FIELDS_TO_COMPARE}
+    gold_openai_correct = {field: 0 for field in FIELDS_TO_COMPARE}
     hybrid_counts = {
         field: {
             "rule_only": 0,
@@ -274,6 +317,7 @@ def main():
         actual_data = extract_label_data(str(image_path))
         labels_tested += 1
         rule_field_results = {}
+        is_gold_label = normalize_image_path(image_path) in gold_set
 
         print(f"\nTesting: {image_path}")
 
@@ -284,6 +328,11 @@ def main():
             field_totals[field] += 1
             passed = compare_field(actual_data, expected_data, field)
             rule_field_results[field] = passed
+
+            if is_gold_label:
+                gold_rule_totals[field] += 1
+                if passed:
+                    gold_rule_correct[field] += 1
 
             if passed:
                 field_passes[field] += 1
@@ -320,6 +369,11 @@ def main():
             llm_field_totals[field] += 1
             passed = compare_field(llm_result, expected_data, field)
             rule_passed = rule_field_results[field]
+
+            if is_gold_label:
+                gold_openai_totals[field] += 1
+                if passed:
+                    gold_openai_correct[field] += 1
 
             if rule_passed and passed:
                 hybrid_counts[field]["both_passed"] += 1
@@ -372,53 +426,70 @@ def main():
 
     if not EVALUATE_LLM:
         print("OpenAI scoring skipped. Set EVALUATE_LLM=true to enable it.")
-        return
-
-    print(f"Labels scored: {llm_labels_scored}")
-    print(f"Labels skipped: {llm_labels_skipped}")
-
-    for field in FIELDS_TO_COMPARE:
-        total = llm_field_totals[field]
-        passed = llm_field_passes[field]
-        accuracy = (passed / total * 100) if total else 0
-
-        readable_name = field.replace("_", " ").title()
-        print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
-
-    if llm_failures:
-        print("\nFailures:")
-
-        for failure in llm_failures:
-            print(
-                f"- {failure['label']} | {failure['field']} | "
-                f"expected={failure['expected']!r} | actual={failure['actual']!r}"
-            )
-    elif llm_labels_scored:
-        print("\nAll fields matched expected values.")
     else:
-        print("\nNo enabled OpenAI results were available to score.")
+        print(f"Labels scored: {llm_labels_scored}")
+        print(f"Labels skipped: {llm_labels_skipped}")
+
+        for field in FIELDS_TO_COMPARE:
+            total = llm_field_totals[field]
+            passed = llm_field_passes[field]
+            accuracy = (passed / total * 100) if total else 0
+
+            readable_name = field.replace("_", " ").title()
+            print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
+
+        if llm_failures:
+            print("\nFailures:")
+
+            for failure in llm_failures:
+                print(
+                    f"- {failure['label']} | {failure['field']} | "
+                    f"expected={failure['expected']!r} | "
+                    f"actual={failure['actual']!r}"
+                )
+        elif llm_labels_scored:
+            print("\nAll fields matched expected values.")
+        else:
+            print("\nNo enabled OpenAI results were available to score.")
 
     print("\n=================================")
-    print("HYBRID FIELD COMPARISON")
+    print("GOLD SET RESULTS")
     print("=================================")
 
-    for field in FIELDS_TO_COMPARE:
-        counts = hybrid_counts[field]
+    if not gold_set_configured:
+        print("Gold Set: not configured")
+    else:
+        print("RULE-BASED")
+        print_gold_metrics(gold_rule_totals, gold_rule_correct)
+        print("\nOPENAI")
 
-        if counts["openai_only"] > counts["rule_only"]:
-            suggested_source = "OpenAI"
-        elif counts["rule_only"] > counts["openai_only"]:
-            suggested_source = "Rule-Based"
+        if EVALUATE_LLM:
+            print_gold_metrics(gold_openai_totals, gold_openai_correct)
         else:
-            suggested_source = "Tie / Needs Review"
+            print("OpenAI scoring skipped. Set EVALUATE_LLM=true to enable it.")
 
-        readable_name = field.replace("_", " ").title()
-        print(f"\n{readable_name}:")
-        print(f"  Rule only: {counts['rule_only']}")
-        print(f"  OpenAI only: {counts['openai_only']}")
-        print(f"  Both passed: {counts['both_passed']}")
-        print(f"  Both failed: {counts['both_failed']}")
-        print(f"  Suggested source: {suggested_source}")
+    if EVALUATE_LLM:
+        print("\n=================================")
+        print("HYBRID FIELD COMPARISON")
+        print("=================================")
+
+        for field in FIELDS_TO_COMPARE:
+            counts = hybrid_counts[field]
+
+            if counts["openai_only"] > counts["rule_only"]:
+                suggested_source = "OpenAI"
+            elif counts["rule_only"] > counts["openai_only"]:
+                suggested_source = "Rule-Based"
+            else:
+                suggested_source = "Tie / Needs Review"
+
+            readable_name = field.replace("_", " ").title()
+            print(f"\n{readable_name}:")
+            print(f"  Rule only: {counts['rule_only']}")
+            print(f"  OpenAI only: {counts['openai_only']}")
+            print(f"  Both passed: {counts['both_passed']}")
+            print(f"  Both failed: {counts['both_failed']}")
+            print(f"  Suggested source: {suggested_source}")
 
 
 if __name__ == "__main__":
