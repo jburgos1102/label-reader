@@ -656,17 +656,25 @@ def extract_label_data(image_path):
         "tracking_number",
         "carrier",
     )
-    selected_result = {
-        field: label_data.get(field, "") for field in selected_fields
-    }
-    selected_result["source"] = {
-        field: "rule_based" for field in selected_fields
-    }
-    label_data["selected_result"] = selected_result
-
     llm_available = isinstance(llm_result, dict) and bool(
         llm_result.get("llm_enabled")
     )
+    selected_result = {
+        field: label_data.get(field, "") for field in selected_fields
+    }
+    selected_sources = {}
+
+    for field in selected_fields:
+        rule_based_value = label_data.get(field, "")
+        openai_value = llm_result.get(field, "") if llm_available else ""
+        values_agree = llm_available and normalize_comparison_value(
+            rule_based_value
+        ) == normalize_comparison_value(openai_value)
+        selected_sources[field] = "agreement" if values_agree else "rule_based"
+
+    selected_result["source"] = selected_sources
+    label_data["selected_result"] = selected_result
+
     comparison = {}
 
     for field in selected_fields:
