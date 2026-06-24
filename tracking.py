@@ -17,6 +17,9 @@ OCR_LETTER_TO_DIGIT = str.maketrans(
 def identify_carrier(tracking_number):
     tracking_number = tracking_number.upper()
 
+    if tracking_number.startswith("SPX"):
+        return "SpeedX"
+
     if tracking_number.startswith("TBA"):
         return "Amazon"
 
@@ -53,6 +56,56 @@ def identify_carrier(tracking_number):
         return "FEDEX"
 
     return "Unknown"
+
+
+def identify_carrier_with_context(tracking_number, ocr_text):
+    """Resolve carrier using tracking evidence plus explicit service context."""
+    carrier = identify_carrier(tracking_number)
+    upper_text = str(ocr_text or "").upper()
+
+    has_ups_final_mile_service = bool(
+        re.search(r"\b(?:SUREPOST|GROUND\s+SAVER)\b", upper_text)
+    )
+    has_ups_tracking_context = bool(
+        re.search(r"\b1Z(?:[\s_-]*[A-Z0-9]){16}\b", upper_text)
+    )
+    has_standalone_ups_marker = bool(
+        re.search(r"(?:^|\n)\s*UPS\s*(?:\n|$)", upper_text)
+    )
+    if (
+        carrier == "USPS"
+        and has_ups_final_mile_service
+        and has_ups_tracking_context
+        and has_standalone_ups_marker
+    ):
+        return "UPS"
+
+    has_usps_context = bool(
+        re.search(r"\bUSPS\b", upper_text)
+        or re.search(r"\bU\.?\s*S\.?\s+POSTAGE\s+PAID\b", upper_text)
+        or re.search(r"\bUS\s+POSTAGE\s+PAID\b", upper_text)
+    )
+    has_explicit_fedex = bool(re.search(r"\bFED\s*EX\b", upper_text))
+
+    if carrier == "FEDEX" and has_usps_context and not has_explicit_fedex:
+        return "USPS"
+
+    if carrier != "Unknown":
+        return carrier
+
+    if re.search(r"\b(?:SPEEDX|SPX[A-Z0-9]*)\b", upper_text):
+        return "SpeedX"
+
+    if has_usps_context:
+        return "USPS"
+
+    if re.search(r"\bUPS\b", upper_text) and has_ups_tracking_context:
+        return "UPS"
+
+    if has_explicit_fedex:
+        return "FEDEX"
+
+    return carrier
 
 
 # --- TRACKING HELPER FUNCTIONS ---

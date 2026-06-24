@@ -13,7 +13,11 @@ from address import (
 from barcodes import extract_tracking_number
 from llm_extractor import extract_fields_with_llm
 from ocr import get_best_ocr_text
-from tracking import extract_tracking_from_ocr_lines, identify_carrier
+from tracking import (
+    extract_tracking_from_ocr_lines,
+    identify_carrier,
+    identify_carrier_with_context,
+)
 
 
 def normalize_comparison_value(value):
@@ -632,7 +636,10 @@ def extract_label_data(image_path):
             label_data["recipient_name"] = fallback_recipient
 
     label_data = normalize_extracted_fields(label_data)
-    label_data["carrier"] = identify_carrier(label_data["tracking_number"])
+    label_data["carrier"] = identify_carrier_with_context(
+        label_data["tracking_number"],
+        text,
+    )
     label_data = score_label_data(label_data)
 
     try:
