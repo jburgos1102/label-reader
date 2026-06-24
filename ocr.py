@@ -2,15 +2,33 @@ import pytesseract
 import re
 
 
+_last_ocr_diagnostics = {
+    "selected_text": "",
+    "rotations": {},
+}
+
+
+def get_last_ocr_diagnostics():
+    """Return a copy of the rotation texts from the most recent OCR call."""
+    return {
+        "selected_text": _last_ocr_diagnostics["selected_text"],
+        "rotations": dict(_last_ocr_diagnostics["rotations"]),
+    }
+
+
 def get_best_ocr_text(image):
+    global _last_ocr_diagnostics
+
     rotations = [0, 90, 180, 270]
 
     best_text = ""
     best_score = -1
+    rotation_texts = {}
 
     for degrees in rotations:
         rotated_image = image.rotate(degrees, expand=True)
         text = pytesseract.image_to_string(rotated_image)
+        rotation_texts[degrees] = text
 
         score = 0
 
@@ -47,5 +65,10 @@ def get_best_ocr_text(image):
         if score > best_score:
             best_score = score
             best_text = text
+
+    _last_ocr_diagnostics = {
+        "selected_text": best_text,
+        "rotations": rotation_texts,
+    }
 
     return best_text

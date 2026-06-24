@@ -5,11 +5,13 @@ from pathlib import Path
 
 
 EVALUATE_LLM = os.getenv("EVALUATE_LLM", "").strip().lower() == "true"
+OCR_DIAGNOSTICS = os.getenv("OCR_DIAGNOSTICS", "").strip().lower() == "true"
 
 if not EVALUATE_LLM:
     os.environ["OPENAI_API_KEY"] = ""
 
 from label_reader import extract_label_data
+from ocr import get_last_ocr_diagnostics
 
 DATASETS_DIR = Path("datasets")
 GOLD_SET_PATH = DATASETS_DIR / "gold_set.txt"
@@ -22,6 +24,13 @@ FIELDS_TO_COMPARE = [
     "tracking_number",
     "carrier",
 ]
+OCR_DIAGNOSTIC_FIELDS = (
+    "recipient_name",
+    "street_address",
+    "city",
+    "state",
+    "zip_code",
+)
 
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
@@ -307,6 +316,74 @@ def compare_field(actual_data, expected_data, field_name):
     return normalize_value(actual_value) == normalize_value(expected_value)
 
 
+def expected_value_in_ocr(expected_value, ocr_text, field_name):
+    if field_name == "zip_code":
+        expected = re.sub(r"\D", "", str(expected_value or ""))
+        text = re.sub(r"\D", "", str(ocr_text or ""))
+        return bool(expected and expected in text)
+
+    expected = normalize_value(expected_value)
+    text = normalize_value(ocr_text)
+    if not expected:
+        return False
+
+    pattern = rf"(?<![A-Z0-9]){re.escape(expected)}(?![A-Z0-9])"
+    return bool(re.search(pattern, text))
+
+
+def build_ocr_failure_diagnostic(label, field, expected_value):
+    ocr_diagnostics = get_last_ocr_diagnostics()
+    selected_text = ocr_diagnostics.get("selected_text", "")
+    rotation_texts = ocr_diagnostics.get("rotations", {})
+    return {
+        "label": label,
+        "field": field,
+        "expected": expected_value,
+        "selected": expected_value_in_ocr(expected_value, selected_text, field),
+        "rotations": {
+            degrees: expected_value_in_ocr(
+                expected_value,
+                rotation_texts.get(degrees, ""),
+                field,
+            )
+            for degrees in (0, 90, 180, 270)
+        },
+    }
+
+
+def print_ocr_failure_diagnostics(diagnostics):
+    print("\n=================================")
+    print("OCR FAILURE DIAGNOSTICS")
+    print("=================================")
+    print("Showing up to 5 failed labels per field.")
+
+    shown_by_field = {field: 0 for field in OCR_DIAGNOSTIC_FIELDS}
+    shown_any = False
+
+    for diagnostic in diagnostics:
+        field = diagnostic["field"]
+        if shown_by_field[field] >= 5:
+            continue
+
+        shown_by_field[field] += 1
+        shown_any = True
+        print(f"\n{diagnostic['label']}")
+        print(f"{field} expected: {diagnostic['expected']}")
+        print(
+            "selected OCR contained expected: "
+            f"{str(diagnostic['selected']).lower()}"
+        )
+        for degrees in (0, 90, 180, 270):
+            contained = diagnostic["rotations"][degrees]
+            print(
+                f"rotation {degrees} contained expected: "
+                f"{str(contained).lower()}"
+            )
+
+    if not shown_any:
+        print("No eligible OCR field failures were found.")
+
+
 def main():
     expected_files = sorted(DATASETS_DIR.glob("*/expected/*.json"))
     gold_set_configured = GOLD_SET_PATH.exists()
@@ -338,6 +415,7 @@ def main():
     llm_labels_skipped = 0
     failures = []
     llm_failures = []
+    ocr_failure_diagnostics = []
 
     for expected_path in expected_files:
         image_path = find_image_for_expected(expected_path)
@@ -377,14 +455,22 @@ def main():
             if passed:
                 field_passes[field] += 1
             else:
-                failures.append(
-                    {
-                        "label": str(image_path),
-                        "field": field,
-                        "expected": expected_data.get(field, ""),
-                        "actual": actual_data.get(field, ""),
-                    }
-                )
+                failure = {
+                    "label": str(image_path),
+                    "field": field,
+                    "expected": expected_data.get(field, ""),
+                    "actual": actual_data.get(field, ""),
+                }
+                failures.append(failure)
+
+                if OCR_DIAGNOSTICS and field in OCR_DIAGNOSTIC_FIELDS:
+                    ocr_failure_diagnostics.append(
+                        build_ocr_failure_diagnostic(
+                            str(image_path),
+                            field,
+                            expected_data.get(field, ""),
+                        )
+                    )
 
                 print(
                     f"  FAIL {field}: "
@@ -461,6 +547,9 @@ def main():
         print("\nAll fields matched expected values.")
 
     print_failure_analysis(failures)
+
+    if OCR_DIAGNOSTICS:
+        print_ocr_failure_diagnostics(ocr_failure_diagnostics)
 
     print("\n=================================")
     print("OPENAI RESULTS")
