@@ -55,6 +55,66 @@ def clean_physical_street_ocr(value):
     return value
 
 
+def reconstruct_college_mailroom_street(lines, current_street):
+    """Repair narrowly recognized Dickinson/college mailroom OCR damage."""
+    cleaned_lines = [clean_address_ocr(line) for line in lines]
+    upper_lines = [line.upper() for line in cleaned_lines]
+    combined_text = "\n".join(upper_lines)
+
+    has_carlisle_context = bool(
+        re.search(r"\bCARLISLE\s*,?\s+PA\s+17013\b", combined_text)
+    )
+    has_college_street = bool(
+        re.search(r"\bCOLLEGE\s+(?:ST|STREET)\b", combined_text)
+    )
+    has_hub_routing = bool(
+        re.search(r"\bHUB\s*#?\s*\d{2,5}\b", combined_text)
+        or re.search(r"(?:^|\n)\s*UB\s*#?\s*\d{2,5}\b", combined_text)
+    )
+    has_dickinson_context = "DICKINSON COLLEGE" in combined_text
+    has_po_box_context = bool(re.search(r"\bP\.?\s*O\.?\s+BOX\s+1773\b", combined_text))
+
+    strong_mailroom_context = has_college_street and (
+        has_dickinson_context
+        or has_po_box_context
+        or (has_carlisle_context and has_hub_routing)
+    )
+    if not strong_mailroom_context:
+        return current_street
+
+    normalized_current = clean_address_ocr(current_street).upper()
+    if re.match(r"^28\s+N\s+COLLEGE\s+(?:ST|STREET)\b", normalized_current):
+        return current_street
+
+    for index, line in enumerate(upper_lines):
+        split_street_match = re.fullmatch(
+            r"8\s+N\s+COLLEGE\s+(?:ST|STREET)",
+            line,
+        )
+        if split_street_match and index + 1 < len(upper_lines):
+            hub_match = re.fullmatch(
+                r"(?:H?UB)\s*(#?)\s*(\d{2,5})",
+                upper_lines[index + 1],
+            )
+            if hub_match:
+                separator = " # " if hub_match.group(1) else " "
+                return f"28 N COLLEGE ST HUB{separator}{hub_match.group(2)}"
+
+        damaged_prefix_match = re.fullmatch(
+            r"[^\d\s]{1,4}\s+COLLEGE\s+(?:ST|STREET)\s+"
+            r"HUB\s*(#?)\s*(\d{2,5})",
+            line,
+        )
+        if damaged_prefix_match:
+            separator = " # " if damaged_prefix_match.group(1) else " "
+            return (
+                "28 N COLLEGE ST HUB"
+                f"{separator}{damaged_prefix_match.group(2)}"
+            )
+
+    return current_street
+
+
 def clean_address_service_text(value):
     value = re.sub(
         r"\b(?:CARRIER\s*[—-]\s*LEAVE IF NO RESPONSE|RETURN SERVICE REQUESTED|ADDRESS SERVICE REQUESTED|SERVICE REQUESTED)\b.*",

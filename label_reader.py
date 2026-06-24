@@ -8,6 +8,7 @@ from address import (
     is_deliver_to_marker,
     is_noise_recipient_line,
     normalize_extracted_fields,
+    reconstruct_college_mailroom_street,
     split_ship_recipient_and_hub,
 )
 from barcodes import extract_tracking_number
@@ -634,6 +635,11 @@ def extract_label_data(image_path):
         fallback_recipient = find_recipient_name_fallback(lines)
         if fallback_recipient:
             label_data["recipient_name"] = fallback_recipient
+
+    label_data["street_address"] = reconstruct_college_mailroom_street(
+        lines,
+        label_data["street_address"],
+    )
 
     label_data = normalize_extracted_fields(label_data)
     label_data["carrier"] = identify_carrier_with_context(
