@@ -407,10 +407,14 @@ def main():
 
     field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
+    selected_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
+    selected_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
     llm_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     llm_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
     gold_rule_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     gold_rule_correct = {field: 0 for field in FIELDS_TO_COMPARE}
+    gold_selected_totals = {field: 0 for field in FIELDS_TO_COMPARE}
+    gold_selected_correct = {field: 0 for field in FIELDS_TO_COMPARE}
     gold_openai_totals = {field: 0 for field in FIELDS_TO_COMPARE}
     gold_openai_correct = {field: 0 for field in FIELDS_TO_COMPARE}
     hybrid_counts = {
@@ -423,9 +427,12 @@ def main():
         for field in FIELDS_TO_COMPARE
     }
     labels_tested = 0
+    selected_labels_scored = 0
+    selected_labels_skipped = 0
     llm_labels_scored = 0
     llm_labels_skipped = 0
     failures = []
+    selected_failures = []
     llm_failures = []
     ocr_failure_diagnostics = []
 
@@ -489,6 +496,36 @@ def main():
                     f"expected={expected_data.get(field, '')!r} "
                     f"actual={actual_data.get(field, '')!r}"
                 )
+
+        selected_result = actual_data.get("selected_result")
+        if not isinstance(selected_result, dict):
+            selected_labels_skipped += 1
+        else:
+            selected_labels_scored += 1
+
+            for field in FIELDS_TO_COMPARE:
+                if not has_ground_truth(expected_data, field):
+                    continue
+
+                selected_field_totals[field] += 1
+                passed = compare_field(selected_result, expected_data, field)
+
+                if is_gold_label:
+                    gold_selected_totals[field] += 1
+                    if passed:
+                        gold_selected_correct[field] += 1
+
+                if passed:
+                    selected_field_passes[field] += 1
+                else:
+                    selected_failures.append(
+                        {
+                            "label": str(image_path),
+                            "field": field,
+                            "expected": expected_data.get(field, ""),
+                            "actual": selected_result.get(field, ""),
+                        }
+                    )
 
         if not EVALUATE_LLM:
             continue
@@ -596,6 +633,35 @@ def main():
             print("\nNo enabled OpenAI results were available to score.")
 
     print("\n=================================")
+    print("SELECTED RESULTS")
+    print("=================================")
+    print(f"Labels scored: {selected_labels_scored}")
+    print(f"Labels skipped: {selected_labels_skipped}")
+
+    if selected_labels_scored:
+        for field in FIELDS_TO_COMPARE:
+            total = selected_field_totals[field]
+            passed = selected_field_passes[field]
+            accuracy = (passed / total * 100) if total else 0
+
+            readable_name = field.replace("_", " ").title()
+            print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
+
+        if selected_failures:
+            print("\nFailures:")
+
+            for failure in selected_failures:
+                print(
+                    f"- {failure['label']} | {failure['field']} | "
+                    f"expected={failure['expected']!r} | "
+                    f"actual={failure['actual']!r}"
+                )
+        else:
+            print("\nAll fields matched expected values.")
+    else:
+        print("No selected_result objects were available to score.")
+
+    print("\n=================================")
     print("GOLD SET RESULTS")
     print("=================================")
 
@@ -610,6 +676,12 @@ def main():
             print_gold_metrics(gold_openai_totals, gold_openai_correct)
         else:
             print("OpenAI scoring skipped. Set EVALUATE_LLM=true to enable it.")
+
+        print("\nSELECTED")
+        if selected_labels_scored:
+            print_gold_metrics(gold_selected_totals, gold_selected_correct)
+        else:
+            print("No selected_result objects were available to score.")
 
     if EVALUATE_LLM:
         print("\n=================================")
