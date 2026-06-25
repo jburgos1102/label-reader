@@ -261,6 +261,12 @@ def is_noise_recipient_line(value):
     ):
         return True
 
+    if re.search(r"\bDICKINSON\s*COLLEGE\b", clean_value):
+        return True
+
+    if re.search(r"\bHUB\s*#?\s*\d+\b", clean_value):
+        return True
+
     if re.search(
         r"\b(?:STREET|ST|ROAD|RD|AVE|AVENUE|BLVD|DR|LANE|LN|WAY)\b",
         clean_value,
@@ -363,6 +369,53 @@ def _recipient_name_shape(value):
         flags=re.IGNORECASE,
     )
     return comma_format, standard_format
+
+
+def _is_clean_person_name_candidate(value):
+    candidate = clean_parser_name(value)
+
+    if not candidate or is_noise_recipient_line(candidate):
+        return False
+
+    if re.search(r"\d", candidate):
+        return False
+
+    letters = sum(character.isalpha() for character in candidate)
+    visible = sum(not character.isspace() for character in candidate)
+    if not visible or letters / visible < 0.75:
+        return False
+
+    comma_format, standard_format = _recipient_name_shape(candidate)
+    return bool(comma_format or standard_format)
+
+
+def find_explicit_to_person_name(lines):
+    """Prefer explicit To: person-name lines over routing/header blocks."""
+    candidates = []
+
+    for index, raw_line in enumerate(lines):
+        same_line_match = re.match(r"^\s*TO\s*:\s*(.+)$", raw_line, re.IGNORECASE)
+        if same_line_match:
+            candidate = clean_parser_name(same_line_match.group(1))
+            if _is_clean_person_name_candidate(candidate):
+                comma_format, _ = _recipient_name_shape(candidate)
+                score = 5 + (3 if comma_format else 0) + index / 1000
+                candidates.append((score, candidate))
+            continue
+
+        marker_match = re.fullmatch(r"\s*TO\s*:?\s*", raw_line, re.IGNORECASE)
+        if marker_match and index + 1 < len(lines):
+            candidate = clean_parser_name(lines[index + 1])
+            if _is_clean_person_name_candidate(candidate):
+                comma_format, _ = _recipient_name_shape(candidate)
+                score = 4 + (3 if comma_format else 0) + index / 1000
+                candidates.append((score, candidate))
+
+    if not candidates:
+        return ""
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
 
 
 def find_recipient_name_fallback(lines):

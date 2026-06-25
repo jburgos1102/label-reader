@@ -4,6 +4,7 @@ from address import (
     choose_recipient_from_lines,
     clean_address_ocr,
     clean_parser_name,
+    find_explicit_to_person_name,
     find_recipient_name_fallback,
     is_deliver_to_marker,
     is_noise_recipient_line,
@@ -639,6 +640,19 @@ def extract_label_data(image_path):
                     label_data["parser_used"] = "generic_city_state_zip"
                     if "generic_city_state_zip" not in label_data["parser_matches"]:
                         label_data["parser_matches"].append("generic_city_state_zip")
+
+    explicit_to_recipient = find_explicit_to_person_name(lines)
+    current_recipient = label_data.get("recipient_name", "")
+    current_recipient_upper = current_recipient.upper()
+    current_recipient_tokens = re.findall(r"[A-Za-z]+", current_recipient)
+
+    if explicit_to_recipient and (
+        not current_recipient
+        or is_noise_recipient_line(current_recipient)
+        or re.search(r"\b(?:HUB|DICKINSON\s*COLLEGE)\b", current_recipient_upper)
+        or len(current_recipient_tokens) < 2
+    ):
+        label_data["recipient_name"] = explicit_to_recipient
 
     if not label_data["recipient_name"]:
         fallback_recipient = find_recipient_name_fallback(lines)

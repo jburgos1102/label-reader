@@ -232,6 +232,18 @@ def compare_recipient_name(actual_value, expected_value):
     if actual_tokens == expected_tokens:
         return True
 
+    if len(actual_tokens) == 1 and len(expected_tokens) >= 2:
+        actual_joined = actual_tokens[0]
+        expected_first_last = expected_tokens[0] + expected_tokens[-1]
+        expected_last_first = expected_tokens[-1] + expected_tokens[0]
+        return actual_joined in (expected_first_last, expected_last_first)
+
+    if len(expected_tokens) == 1 and len(actual_tokens) >= 2:
+        expected_joined = expected_tokens[0]
+        actual_first_last = actual_tokens[0] + actual_tokens[-1]
+        actual_last_first = actual_tokens[-1] + actual_tokens[0]
+        return expected_joined in (actual_first_last, actual_last_first)
+
     if len(actual_tokens) < 2 or len(expected_tokens) < 2:
         return False
 
