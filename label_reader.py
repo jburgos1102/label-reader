@@ -30,6 +30,126 @@ def normalize_comparison_value(value):
     return " ".join(normalized.split())
 
 
+def score_llm_result(llm_result, ocr_text):
+    return {
+        "recipient_name": None,
+        "street_address": None,
+        "city": None,
+        "state": None,
+        "zip_code": None,
+        "tracking_number": None,
+        "carrier": None,
+    }
+
+
+def get_parser_selection_reason(field, parser_used, label_data):
+    if field == "recipient_name":
+        if parser_used == "college_mailroom_parser":
+            return "college_mailroom_parser"
+        if parser_used in ("zip_first_spaced", "zip_first_combined"):
+            return "zip_first_parser"
+        if parser_used in (
+            "deliver_to",
+            "uniuni_deliver_to",
+            "generic_city_state_zip",
+            "city_state_country_zip",
+            "city_first_to_address",
+        ):
+            return "generic_parser"
+        return "rule_based"
+
+    if field == "street_address":
+        if parser_used in ("deliver_to", "uniuni_deliver_to"):
+            return "deliver_to_parser"
+        if parser_used == "college_mailroom_parser":
+            return "college_mailroom_parser"
+        if label_data.get("city", "").upper() == "UNIVERSITY PARK":
+            return "penn_state_parser"
+        if parser_used in ("zip_first_spaced", "zip_first_combined"):
+            return "zip_first_parser"
+        if parser_used:
+            return "generic_parser"
+        return "rule_based"
+
+    if field in ("city", "state", "zip_code"):
+        if parser_used in ("deliver_to", "uniuni_deliver_to"):
+            return "deliver_to_parser"
+        if parser_used == "college_mailroom_parser":
+            return "college_mailroom_parser"
+        if label_data.get("city", "").upper() == "UNIVERSITY PARK":
+            return "penn_state_parser"
+        if parser_used in ("zip_first_spaced", "zip_first_combined"):
+            return "zip_first_parser"
+        if parser_used:
+            return "generic_parser"
+        return "rule_based"
+
+    if field == "tracking_number":
+        return "tracking_detection"
+
+    if field == "carrier":
+        return "carrier_detection"
+
+    return "rule_based"
+
+
+def build_selection_metadata(
+    selected_fields,
+    label_data,
+    selected_sources,
+    comparison,
+    llm_confidence,
+    recipient_selection_reason,
+    tracking_source,
+):
+    confidence = label_data.get("confidence", {})
+    parser_used = label_data.get("parser_used", "")
+    metadata = {}
+
+    for field in selected_fields:
+        selected_value = label_data.get(field, "")
+        field_comparison = comparison.get(field, {})
+        values_agree = bool(field_comparison.get("agreement"))
+
+        if not selected_value:
+            selected_source = "blank"
+            selected_reason = "rule_blank"
+        elif values_agree:
+            selected_source = "agreement"
+            selected_reason = "agreement"
+        else:
+            selected_source = selected_sources.get(field, "rule_based")
+            if field == "recipient_name" and recipient_selection_reason:
+                selected_reason = recipient_selection_reason
+            elif field == "tracking_number":
+                selected_reason = (
+                    "ocr_tracking" if tracking_source == "ocr" else tracking_source
+                )
+                if selected_reason == "unknown":
+                    selected_reason = "tracking_detection"
+            else:
+                selected_reason = get_parser_selection_reason(
+                    field,
+                    parser_used,
+                    label_data,
+                )
+
+        field_metadata = {
+            "selected_source": selected_source,
+            "selected_reason": selected_reason,
+            "rule_confidence": confidence.get(field),
+            "llm_confidence": llm_confidence.get(field),
+            "agreement": values_agree,
+        }
+
+        if field == "tracking_number":
+            field_metadata["tracking_source"] = tracking_source
+
+        metadata[field] = field_metadata
+
+    return metadata
+
+
 # --- SCORING FUNCTION ---
 def score_label_data(label_data):
     confidence = {
@@ -130,6 +250,7 @@ def extract_label_data(image_path):
     }
 
     label_data["tracking_number"] = extract_tracking_number(image)
+    barcode_tracking_number = label_data["tracking_number"]
     label_data["carrier"] = identify_carrier(label_data["tracking_number"])
 
     text = get_best_ocr_text(image)
@@ -645,6 +766,7 @@ def extract_label_data(image_path):
     current_recipient = label_data.get("recipient_name", "")
     current_recipient_upper = current_recipient.upper()
     current_recipient_tokens = re.findall(r"[A-Za-z]+", current_recipient)
+    recipient_selection_reason = ""
 
     if explicit_to_recipient and (
         not current_recipient
@@ -653,11 +775,13 @@ def extract_label_data(image_path):
         or len(current_recipient_tokens) < 2
     ):
         label_data["recipient_name"] = explicit_to_recipient
+        recipient_selection_reason = "explicit_to_line"
 
     if not label_data["recipient_name"]:
         fallback_recipient = find_recipient_name_fallback(lines)
         if fallback_recipient:
             label_data["recipient_name"] = fallback_recipient
+            recipient_selection_reason = "recipient_fallback"
 
     label_data["street_address"] = reconstruct_college_mailroom_street(
         lines,
@@ -679,6 +803,17 @@ def extract_label_data(image_path):
     )
     label_data = score_label_data(label_data)
 
+    if barcode_tracking_number and (
+        label_data.get("tracking_number") == barcode_tracking_number
+    ):
+        tracking_source = "barcode"
+    elif ocr_tracking_candidate and (
+        label_data.get("tracking_number") == ocr_tracking_candidate
+    ):
+        tracking_source = "ocr"
+    else:
+        tracking_source = "unknown"
+
     try:
         llm_result = extract_fields_with_llm(text, label_data)
     except Exception:
@@ -697,6 +832,7 @@ def extract_label_data(image_path):
         }
 
     label_data["llm_result"] = llm_result
+    llm_confidence = score_llm_result(llm_result, text)
 
     selected_fields = (
         "recipient_name",
@@ -723,8 +859,9 @@ def extract_label_data(image_path):
         ) == normalize_comparison_value(openai_value)
         selected_sources[field] = "agreement" if values_agree else "rule_based"
 
-    selected_result["source"] = selected_sources
     label_data["selected_result"] = selected_result
+    label_data["selected_sources"] = selected_sources
+    log.debug("selected_sources=%s", selected_sources)
 
     comparison = {}
 
@@ -742,6 +879,18 @@ def extract_label_data(image_path):
         }
 
     label_data["comparison"] = comparison
+
+    selection_metadata = build_selection_metadata(
+        selected_fields,
+        label_data,
+        selected_sources,
+        comparison,
+        llm_confidence,
+        recipient_selection_reason,
+        tracking_source,
+    )
+    label_data["selection_metadata"] = selection_metadata
+    log.debug("selection_metadata=%s", selection_metadata)
 
     return label_data
 
