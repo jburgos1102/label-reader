@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request
+from werkzeug.utils import secure_filename
 from label_reader import extract_label_data
 import os
 import json
@@ -25,14 +26,18 @@ def upload():
 
     uploaded_file = request.files["label_image"]
 
-    if uploaded_file.filename == "":
+    filename = secure_filename(uploaded_file.filename)
+
+    if filename == "":
         return render_template(
             "index.html",
             label_data=None,
-            error_message="Please select a shipping label image before clicking Upload.",
+            error_message="Please upload a file with a valid filename.",
         )
 
-    image_path = os.path.join(UPLOAD_FOLDER, uploaded_file.filename)
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+    image_path = os.path.join(UPLOAD_FOLDER, filename)
 
     uploaded_file.save(image_path)
 
