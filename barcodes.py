@@ -1,6 +1,7 @@
 import re
 from pyzbar.pyzbar import decode
 
+from logger import log
 from tracking import clean_tracking_candidate, is_valid_tracking_candidate
 
 
@@ -13,11 +14,16 @@ def extract_tracking_number(image):
         barcodes = decode(rotated_image)
 
         if barcodes:
-            print(f"\n--- BARCODES FOUND AT ROTATION {degrees} ---")
+            log.debug("Barcodes found at rotation %s", degrees)
 
             for barcode_index, barcode in enumerate(barcodes):
                 barcode_data = barcode.data.decode("utf-8")
-                print(barcode_index, repr(barcode_data), barcode.type)
+                log.debug(
+                    "Barcode %s data=%r type=%s",
+                    barcode_index,
+                    barcode_data,
+                    barcode.type,
+                )
 
                 barcode_parts = barcode_data.split("\x1d")
 
@@ -26,7 +32,7 @@ def extract_tracking_number(image):
                 else:
                     candidate = barcode_data
 
-                print("TRACKING CANDIDATE:", repr(candidate))
+                log.debug("Barcode tracking candidate: %r", candidate)
 
                 candidate = clean_tracking_candidate(candidate)
 

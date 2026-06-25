@@ -1,6 +1,8 @@
 import pytesseract
 import re
 
+from logger import log
+
 
 _last_ocr_diagnostics = {
     "selected_text": "",
@@ -140,9 +142,8 @@ def get_best_ocr_text(image):
 
         score = score_ocr_text(text)
 
-        print(f"OCR ROTATION {degrees} SCORE:", score)
-        print(text[:200])
-        print("---")
+        log.debug("OCR rotation %s score: %s", degrees, score)
+        log.debug("OCR rotation %s preview: %s", degrees, text[:200])
 
         if score > best_score:
             best_score = score

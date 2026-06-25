@@ -7,6 +7,7 @@ import time
 import cv2
 import numpy as np
 from label_reader import extract_label_data
+from logger import log
 
 
 def find_label_contour(frame):
@@ -132,6 +133,7 @@ def main():
     captured_message_until = 0.0
 
     if not camera.isOpened():
+        log.error("Unable to open the camera")
         print("Unable to open the camera. Check that it is connected and available.")
         camera.release()
         return
@@ -141,6 +143,7 @@ def main():
             frame_available, frame = camera.read()
 
             if not frame_available:
+                log.error("Unable to read a camera frame")
                 print("Unable to read a camera frame. Closing the detector.")
                 break
 
@@ -175,6 +178,7 @@ def main():
                         captured_message_until = current_time + 2.0
                         print(f"Captured label: {capture_path}")
                     else:
+                        log.error("Unable to save captured label: %s", capture_path)
                         print(f"Unable to save captured label: {capture_path}")
 
                     try:
@@ -199,11 +203,22 @@ def main():
                                     extraction_path = enhanced_path
                                     extraction_source = "enhanced image"
                                 else:
+                                    log.warning(
+                                        "Unable to save enhanced label: %s; "
+                                        "falling back to raw crop: %s",
+                                        enhanced_path,
+                                        crop_path,
+                                    )
                                     print(
                                         f"Unable to save enhanced label: {enhanced_path}. "
                                         f"Falling back to raw crop: {crop_path}"
                                     )
                             except Exception as error:
+                                log.exception(
+                                    "Unable to enhance cropped label; falling back "
+                                    "to raw crop: %s",
+                                    crop_path,
+                                )
                                 print(
                                     "Unable to enhance the cropped label at "
                                     f"{enhanced_path}; falling back to raw crop "
@@ -223,13 +238,18 @@ def main():
                                 print("============================")
                                 print(json.dumps(extraction_result, indent=2))
                             except Exception as error:
+                                log.exception(
+                                    "Unable to extract data from captured label"
+                                )
                                 print(
                                     "Unable to extract data from the captured label; "
                                     f"saved images were kept: {error}"
                                 )
                         else:
+                            log.error("Unable to save cropped label: %s", crop_path)
                             print(f"Unable to save cropped label: {crop_path}")
                     except (ValueError, cv2.error) as error:
+                        log.exception("Unable to crop detected label")
                         print(f"Unable to crop the label; full frame was kept: {error}")
             else:
                 detection_started_at = None

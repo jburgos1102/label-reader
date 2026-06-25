@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 from label_reader import extract_label_data
+from logger import log
 import os
 import json
 
@@ -39,9 +40,25 @@ def upload():
 
     image_path = os.path.join(UPLOAD_FOLDER, filename)
 
-    uploaded_file.save(image_path)
+    try:
+        uploaded_file.save(image_path)
+    except Exception:
+        log.exception("Unable to save uploaded file")
+        return render_template(
+            "index.html",
+            label_data=None,
+            error_message="Unable to save the uploaded image. Please try again.",
+        )
 
-    label_data = extract_label_data(image_path)
+    try:
+        label_data = extract_label_data(image_path)
+    except Exception:
+        log.exception("Unable to extract label data from uploaded file")
+        return render_template(
+            "index.html",
+            label_data=None,
+            error_message="Unable to read that shipping label image. Please try another file.",
+        )
 
     label_data_json = json.dumps(label_data, indent=4)
 

@@ -14,6 +14,7 @@ from address import (
 )
 from barcodes import extract_tracking_number
 from llm_extractor import extract_fields_with_llm
+from logger import log
 from ocr import get_best_ocr_text
 from tracking import (
     extract_tracking_from_ocr_lines,
@@ -139,17 +140,15 @@ def extract_label_data(image_path):
         if cleaned_line:
             lines.append(cleaned_line)
 
-    print("\n--- RAW OCR TEXT ---")
-    print(text)
+    log.debug("Raw OCR text:\n%s", text)
 
-    print("\n--- OCR LINES ---")
     for line_index, line in enumerate(lines):
-        print(line_index, repr(line))
+        log.debug("OCR line %s: %r", line_index, line)
 
     ocr_tracking_candidate = extract_tracking_from_ocr_lines(lines)
 
     if ocr_tracking_candidate:
-        print("OCR TRACKING CANDIDATE:", repr(ocr_tracking_candidate))
+        log.debug("OCR tracking candidate: %r", ocr_tracking_candidate)
 
         has_usps_tracking_label = any(
             "USPS" in line.upper() and "TRACKING" in line.upper() for line in lines
@@ -174,19 +173,23 @@ def extract_label_data(image_path):
         if is_deliver_to_marker(line):
 
             if "USPS" not in line.upper():
-                print(f"\nFOUND NON-USPS DELIVER TO AT LINE {line_index}")
+                log.debug("Found non-USPS deliver-to marker at line %s", line_index)
 
                 for nearby_index in range(line_index, min(line_index + 6, len(lines))):
-                    print(nearby_index, repr(lines[nearby_index]))
+                    log.debug(
+                        "Non-USPS deliver-to nearby line %s: %r",
+                        nearby_index,
+                        lines[nearby_index],
+                    )
 
                 if line_index + 4 < len(lines):
                     uniuni_city_state_line = lines[line_index + 2]
                     uniuni_street_line = lines[line_index + 3]
                     uniuni_zip_line = lines[line_index + 4]
 
-                    print("UNIUNI CITY/STATE CANDIDATE:", repr(uniuni_city_state_line))
-                    print("UNIUNI STREET CANDIDATE:", repr(uniuni_street_line))
-                    print("UNIUNI ZIP CANDIDATE:", repr(uniuni_zip_line))
+                    log.debug("UniUni city/state candidate: %r", uniuni_city_state_line)
+                    log.debug("UniUni street candidate: %r", uniuni_street_line)
+                    log.debug("UniUni ZIP candidate: %r", uniuni_zip_line)
 
                     uniuni_city_state_match = re.search(
                         r"([A-Za-z]+),?\s+([A-Z]{2}),?",
@@ -195,9 +198,12 @@ def extract_label_data(image_path):
                     uniuni_street_match = re.match(r"\d+", uniuni_street_line)
                     uniuni_zip_match = re.search(r"\d{5}", uniuni_zip_line)
 
-                    print("UNIUNI CITY/STATE MATCH:", bool(uniuni_city_state_match))
-                    print("UNIUNI STREET MATCH:", bool(uniuni_street_match))
-                    print("UNIUNI ZIP MATCH:", bool(uniuni_zip_match))
+                    log.debug(
+                        "UniUni city/state match: %s",
+                        bool(uniuni_city_state_match),
+                    )
+                    log.debug("UniUni street match: %s", bool(uniuni_street_match))
+                    log.debug("UniUni ZIP match: %s", bool(uniuni_zip_match))
 
                     if (
                         uniuni_city_state_match
@@ -214,10 +220,10 @@ def extract_label_data(image_path):
 
                         used_deliver_to_block = True
 
-            print(f"\nFOUND DELIVER TO AT LINE {line_index}")
+            log.debug("Found deliver-to marker at line %s", line_index)
 
             if line_index + 3 < len(lines):
-                print("DELIVER TO HAS ENOUGH LINES")
+                log.debug("Deliver-to block has enough lines")
                 deliver_to_name = lines[line_index + 1]
                 deliver_to_street = lines[line_index + 2]
                 deliver_to_city_line = lines[line_index + 3]
@@ -225,9 +231,9 @@ def extract_label_data(image_path):
                 deliver_to_street = clean_address_ocr(deliver_to_street)
                 deliver_to_city_line = clean_address_ocr(deliver_to_city_line)
 
-                print("DELIVER TO NAME:", repr(deliver_to_name))
-                print("DELIVER TO STREET:", repr(deliver_to_street))
-                print("DELIVER TO CITY LINE:", repr(deliver_to_city_line))
+                log.debug("Deliver-to name: %r", deliver_to_name)
+                log.debug("Deliver-to street: %r", deliver_to_street)
+                log.debug("Deliver-to city line: %r", deliver_to_city_line)
 
                 deliver_to_city_parts = [
                     part.strip(",")
@@ -235,7 +241,7 @@ def extract_label_data(image_path):
                     if part.strip(",")
                 ]
 
-                print("DELIVER TO CITY PARTS:", deliver_to_city_parts)
+                log.debug("Deliver-to city parts: %s", deliver_to_city_parts)
 
                 if len(deliver_to_city_parts) >= 2:
                     state_candidate = deliver_to_city_parts[-2]
@@ -262,8 +268,8 @@ def extract_label_data(image_path):
 
                         zip_match = re.fullmatch(r"\d{5}", zip_candidate)
 
-                    print("STATE MATCH:", bool(state_match))
-                    print("ZIP MATCH:", bool(zip_match))
+                    log.debug("Deliver-to state match: %s", bool(state_match))
+                    log.debug("Deliver-to ZIP match: %s", bool(zip_match))
 
                     if state_match and zip_match:
                         if deliver_to_city_parts[-1] == zip_candidate:
@@ -333,7 +339,7 @@ def extract_label_data(image_path):
                             break
 
         if "18974" in line:
-            print("ZIP-FIRST PARTS:", parts)
+            log.debug("ZIP-first parts: %s", parts)
 
         if len(parts) >= 6:
             zip_match = re.fullmatch(r"\d{5}", parts[0])
@@ -341,9 +347,9 @@ def extract_label_data(image_path):
             plus_four_match = re.fullmatch(r"\d{4}", parts[2])
             state_match = re.fullmatch(r"[A-Z]{2}", parts[5])
 
-            print("ZIP-FIRST ZIP:", bool(zip_match))
-            print("ZIP-FIRST PLUS4:", bool(plus_four_match))
-            print("ZIP-FIRST STATE:", bool(state_match))
+            log.debug("ZIP-first ZIP match: %s", bool(zip_match))
+            log.debug("ZIP-first plus-four match: %s", bool(plus_four_match))
+            log.debug("ZIP-first state match: %s", bool(state_match))
 
             if zip_match and plus_four_match and state_match and line_index >= 3:
                 recipient_name = lines[line_index - 3]
@@ -365,8 +371,8 @@ def extract_label_data(image_path):
             zip_first_match = re.fullmatch(r"(\d{5})[-–—](\d{4})", parts[0])
             state_match = re.fullmatch(r"[A-Z]{2}", parts[3])
 
-            print("ZIP-FIRST COMBINED ZIP:", bool(zip_first_match))
-            print("ZIP-FIRST COMBINED STATE:", bool(state_match))
+            log.debug("ZIP-first combined ZIP match: %s", bool(zip_first_match))
+            log.debug("ZIP-first combined state match: %s", bool(state_match))
 
             if zip_first_match and state_match and line_index >= 2:
                 recipient_name = lines[line_index - 2]
@@ -391,7 +397,7 @@ def extract_label_data(image_path):
         )
 
         if country_zip_match:
-            print("CITY/STATE/COUNTRY/ZIP MATCH:", country_zip_match.groups())
+            log.debug("City/state/country/ZIP match: %s", country_zip_match.groups())
 
             if line_index - 2 >= 0:
                 recipient_name = lines[line_index - 2]
@@ -437,12 +443,14 @@ def extract_label_data(image_path):
                 keyword in previous_text for keyword in mailroom_keywords
             )
 
-            print(
-                "COLLEGE MAILROOM CITY/STATE/ZIP MATCH:",
+            log.debug(
+                "College mailroom city/state/ZIP match: %s",
                 college_mailroom_match.groups(),
             )
-            print(
-                "COLLEGE MAILROOM CONTEXT:", college_city_match, college_context_match
+            log.debug(
+                "College mailroom context: city=%s context=%s",
+                college_city_match,
+                college_context_match,
             )
 
             if college_city_match or college_context_match:
@@ -660,6 +668,7 @@ def extract_label_data(image_path):
     try:
         llm_result = extract_fields_with_llm(text, label_data)
     except Exception:
+        log.exception("OpenAI extraction failed; using the rule-based result")
         llm_result = {
             "recipient_name": label_data.get("recipient_name", ""),
             "street_address": label_data.get("street_address", ""),
