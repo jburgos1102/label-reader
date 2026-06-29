@@ -82,7 +82,7 @@ def score_label_data(label_data):
         warnings.append("state_missing_or_invalid")
 
     if re.fullmatch(r"\d{5}(-\d{4})?", zip_code):
-        confidence["zip_code"] = config.CONFIDENCE_ZIP_VALID
+        confidence["zip_code"] = config.CONFIDENCE_ZIP_OCR
     else:
         warnings.append("zip_code_missing_or_invalid")
 

@@ -16,11 +16,10 @@
             --accent-hover: #00a4e8;
             --danger: #ff6b6b;
             --code: #0f0b0c;
+            --green: #4caf50;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             min-height: 100vh;
@@ -31,48 +30,104 @@
         }
 
         .app {
-            width: min(100%, 980px);
+            width: min(100%, 1100px);
             min-height: 100vh;
-            padding: 24px clamp(18px, 5vw, 72px) 36px;
+            padding: 24px clamp(16px, 4vw, 60px) 48px;
         }
 
         h1 {
-            margin: 0 0 26px;
-            font-size: clamp(28px, 5vw, 42px);
+            margin: 0 0 24px;
+            font-size: clamp(26px, 5vw, 40px);
             font-weight: 700;
-            letter-spacing: 0;
+        }
+
+        h2 {
+            margin: 0 0 14px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        /* ── Two-column layout ── */
+        .scanner-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .left-col {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .panel {
-            width: min(100%, 760px);
-            padding: clamp(24px, 5vw, 44px);
+            padding: clamp(18px, 3vw, 32px);
             border: 1px solid var(--row-border);
             background: var(--panel);
         }
 
-        .panel + .panel {
-            margin-top: 24px;
-        }
-
-        .section-title {
-            margin: 0 0 10px;
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        .helper-text {
-            margin: 0 0 12px;
+        /* ── Camera panel ── */
+        .field-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 13px;
             color: var(--muted);
+        }
+
+        select {
+            width: 100%;
+            margin-bottom: 14px;
+            padding: 8px 10px;
+            border: 1px solid var(--row-border);
+            border-radius: 5px;
+            background: var(--row);
+            color: var(--text);
             font-size: 14px;
         }
 
+        #camera-preview {
+            display: block;
+            width: 100%;
+            min-height: 240px;
+            max-height: 400px;
+            object-fit: cover;
+            background: #000;
+            margin-bottom: 10px;
+        }
+
+        .camera-status {
+            margin: 0 0 10px;
+            font-size: 13px;
+            color: var(--muted);
+            min-height: 1.4em;
+        }
+
+        .barcode-status {
+            margin: 0 0 14px;
+            font-size: 13px;
+            color: var(--muted);
+            min-height: 1.4em;
+        }
+
+        .barcode-found {
+            color: var(--green);
+            font-weight: 600;
+        }
+
+        /* ── Camera button row ── */
+        .camera-btn-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* ── Upload row ── */
         .upload-row {
             display: grid;
             grid-template-columns: 1fr auto;
             gap: 12px;
             align-items: center;
-            min-height: 52px;
-            margin-bottom: 26px;
             padding: 10px;
             background: var(--row);
             border: 1px solid var(--row-border);
@@ -85,8 +140,8 @@
         }
 
         input[type="file"]::file-selector-button {
-            margin-right: 12px;
-            padding: 9px 13px;
+            margin-right: 10px;
+            padding: 7px 12px;
             border: 0;
             border-radius: 4px;
             background: #efefef;
@@ -95,21 +150,26 @@
             cursor: pointer;
         }
 
+        /* ── Buttons ── */
         button {
             min-width: 118px;
             min-height: 38px;
-            padding: 0 22px;
+            padding: 0 20px;
             border: 0;
             border-radius: 7px;
             background: var(--accent);
             color: #fff;
-            font-size: 16px;
+            font-size: 15px;
             cursor: pointer;
+            white-space: nowrap;
         }
 
         button:hover,
-        button:focus-visible {
-            background: var(--accent-hover);
+        button:focus-visible { background: var(--accent-hover); }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         button.secondary {
@@ -118,67 +178,44 @@
         }
 
         button.secondary:hover,
-        button.secondary:focus-visible {
-            background: #3a3535;
+        button.secondary:focus-visible { background: #3a3535; }
+
+        /* ── Results panel ── */
+        .results-panel { min-height: 300px; }
+
+        .helper-text {
+            margin: 0 0 12px;
+            color: var(--muted);
+            font-size: 14px;
         }
 
-        .error {
+        .error-msg {
             margin: 0 0 12px;
             color: var(--danger);
             font-weight: 700;
+            font-size: 14px;
         }
 
         pre {
-            min-height: 240px;
-            max-height: 420px;
+            min-height: 200px;
+            max-height: 600px;
             margin: 0;
-            padding: 18px;
+            padding: 16px;
             overflow: auto;
             border: 1px solid var(--row-border);
             background: var(--code);
             color: #e8f7ff;
-            font-size: 14px;
-            line-height: 1.45;
+            font-size: 13px;
+            line-height: 1.5;
             white-space: pre-wrap;
         }
 
-        /* Camera section */
-        .camera-controls {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
-
-        #camera-preview {
-            display: block;
-            width: 100%;
-            max-height: 360px;
-            object-fit: contain;
-            background: #000;
-            margin-bottom: 16px;
-        }
-
-        .camera-output-header {
-            margin: 20px 0 10px;
-        }
-
-        @media (max-width: 620px) {
-            .app {
-                padding: 20px 16px 28px;
-            }
-
-            .panel {
-                padding: 20px;
-            }
-
-            .upload-row {
-                grid-template-columns: 1fr;
-            }
-
-            button {
-                width: 100%;
-            }
+        /* ── Mobile: stack columns ── */
+        @media (max-width: 680px) {
+            .scanner-layout { grid-template-columns: 1fr; }
+            .upload-row { grid-template-columns: 1fr; }
+            button { width: 100%; }
+            .camera-btn-row { flex-direction: column; }
         }
     </style>
 </head>
@@ -186,124 +223,267 @@
     <main class="app">
         <h1>Label Reader POC</h1>
 
-        <section class="panel" aria-labelledby="upload-title">
-            <h2 class="section-title" id="upload-title">Upload Label</h2>
-            <p class="helper-text">Upload a shipping label image.</p>
+        <div class="scanner-layout">
 
-            <form
-                action="/upload"
-                method="POST"
-                enctype="multipart/form-data"
-            >
-                <div class="upload-row">
-                    <input
-                        type="file"
-                        name="label_image"
-                        accept="image/*"
-                    >
+            <!-- ── LEFT: camera + file upload ── -->
+            <div class="left-col">
 
-                    <button type="submit">
-                        Upload
-                    </button>
-                </div>
-            </form>
+                <section class="panel" aria-labelledby="cam-title">
+                    <h2 id="cam-title">Camera Scan</h2>
 
-            <h2 class="section-title">JSON Output</h2>
+                    <label for="camera-source" class="field-label">Camera Source</label>
+                    <select id="camera-source">
+                        <option value="">Detecting cameras…</option>
+                    </select>
 
-            {% if error_message %}
-                <p class="error">
-                    {{ error_message }}
+                    <video id="camera-preview" autoplay playsinline></video>
+
+                    <p id="barcode-status" class="barcode-status"></p>
+                    <p id="camera-status" class="camera-status">Connecting to camera…</p>
+
+                    <div class="camera-btn-row">
+                        <button type="button" id="capture-btn" disabled>Capture &amp; Scan</button>
+                        <button type="button" id="toggle-camera-btn" class="secondary">Stop Camera</button>
+                    </div>
+                </section>
+
+                <section class="panel" aria-labelledby="upload-title">
+                    <h2 id="upload-title">Upload Image</h2>
+                    <div class="upload-row">
+                        <input type="file" id="file-input" accept="image/*">
+                        <button type="button" id="upload-btn">Upload</button>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- ── RIGHT: results ── -->
+            <section class="panel results-panel" aria-labelledby="results-title">
+                <h2 id="results-title">Results</h2>
+                <p id="results-placeholder" class="helper-text">
+                    Capture a label or upload an image to see results here.
                 </p>
-            {% endif %}
+                <p id="results-error" class="error-msg" hidden></p>
+                <pre id="results-output" hidden></pre>
+            </section>
 
-            {% if label_data %}
-                <pre>{{ label_data }}</pre>
-            {% else %}
-                <pre>{}</pre>
-            {% endif %}
-        </section>
-
-        <section class="panel" aria-labelledby="camera-title">
-            <h2 class="section-title" id="camera-title">Camera Scan</h2>
-            <p class="helper-text">Hold the label in front of your camera, then click Capture &amp; Scan.</p>
-
-            <div class="camera-controls">
-                <button type="button" id="start-camera">Start Camera</button>
-                <button type="button" id="capture-btn" hidden>Capture &amp; Scan</button>
-                <button type="button" id="stop-camera" class="secondary" hidden>Stop Camera</button>
-            </div>
-
-            <video id="camera-preview" autoplay playsinline hidden></video>
-            <canvas id="camera-canvas" hidden></canvas>
-
-            <div id="camera-result-wrapper" hidden>
-                <h2 class="section-title camera-output-header">Scan Result</h2>
-                <pre id="camera-output"></pre>
-            </div>
-        </section>
+        </div>
     </main>
+
+    <canvas id="camera-canvas" hidden></canvas>
 
     <script>
     (function () {
-        var video   = document.getElementById('camera-preview');
-        var canvas  = document.getElementById('camera-canvas');
-        var startBtn   = document.getElementById('start-camera');
-        var captureBtn = document.getElementById('capture-btn');
-        var stopBtn    = document.getElementById('stop-camera');
-        var resultWrap = document.getElementById('camera-result-wrapper');
-        var output  = document.getElementById('camera-output');
-        var stream  = null;
+        var video            = document.getElementById('camera-preview');
+        var canvas           = document.getElementById('camera-canvas');
+        var captureBtn       = document.getElementById('capture-btn');
+        var toggleCameraBtn  = document.getElementById('toggle-camera-btn');
+        var camSelect        = document.getElementById('camera-source');
+        var statusEl         = document.getElementById('camera-status');
+        var barcodeStatusEl  = document.getElementById('barcode-status');
+        var fileInput        = document.getElementById('file-input');
+        var uploadBtn        = document.getElementById('upload-btn');
+        var placeholder      = document.getElementById('results-placeholder');
+        var errEl            = document.getElementById('results-error');
+        var outputEl         = document.getElementById('results-output');
+        var stream           = null;
+        var cameraActive     = false;
+        var detector         = null;
 
-        startBtn.addEventListener('click', function () {
-            navigator.mediaDevices.getUserMedia({
-                video: { facingMode: { ideal: 'environment' } }
-            }).then(function (s) {
-                stream = s;
-                video.srcObject = stream;
-                video.hidden = false;
-                startBtn.hidden = true;
-                captureBtn.hidden = false;
-                stopBtn.hidden = false;
-            }).catch(function (err) {
-                output.textContent = 'Camera error: ' + err.message;
-                resultWrap.hidden = false;
-            });
+        /* ── Results helpers ── */
+        function showResults(data) {
+            placeholder.hidden = true;
+            errEl.hidden = true;
+            outputEl.textContent = JSON.stringify(data, null, 4);
+            outputEl.hidden = false;
+        }
+
+        function showError(msg) {
+            placeholder.hidden = true;
+            outputEl.hidden = true;
+            errEl.textContent = msg;
+            errEl.hidden = false;
+        }
+
+        /* ── POST image to /api/scan ── */
+        function postImage(blob, filename) {
+            var fd = new FormData();
+            fd.append('label_image', blob, filename);
+            return fetch('/api/scan', { method: 'POST', body: fd })
+                .then(function (resp) {
+                    return resp.json().then(function (body) {
+                        if (!resp.ok) throw new Error(body.error || 'Server error ' + resp.status);
+                        return body;
+                    });
+                });
+        }
+
+        /* ── Barcode detection (native BarcodeDetector, client-side only) ── */
+        function startBarcodeScan() {
+            if (!('BarcodeDetector' in window)) return;
+            if (!detector) {
+                detector = new BarcodeDetector({
+                    formats: ['code_128', 'qr_code', 'pdf417', 'code_39', 'code_93']
+                });
+            }
+            barcodeStatusEl.textContent = 'Searching for barcode...';
+            barcodeStatusEl.style.color = '';
+            barcodeStatusEl.hidden = false;
+            scanLoop();
+        }
+
+        function scanLoop() {
+            if (!cameraActive) return;
+            detector.detect(video)
+                .then(function (barcodes) {
+                    if (!cameraActive) return;
+                    if (barcodes.length > 0) {
+                        barcodeStatusEl.textContent = 'Barcode detected: ' + barcodes[0].rawValue;
+                        barcodeStatusEl.style.color = 'green';
+                    } else {
+                        barcodeStatusEl.textContent = 'Searching for barcode...';
+                        barcodeStatusEl.style.color = '';
+                    }
+                })
+                .catch(function () {})
+                .then(function () {
+                    if (cameraActive) requestAnimationFrame(scanLoop);
+                });
+        }
+
+        function stopBarcodeScan() {
+            cameraActive = false;
+            barcodeStatusEl.textContent = '';
+            barcodeStatusEl.hidden = true;
+        }
+
+        /* ── Camera device list ── */
+        function populateDevices(activeDeviceId) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+            navigator.mediaDevices.enumerateDevices().then(function (devices) {
+                var videoDevices = devices.filter(function (d) { return d.kind === 'videoinput'; });
+                camSelect.innerHTML = '';
+                videoDevices.forEach(function (d, i) {
+                    var opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.textContent = d.label || ('Camera ' + (i + 1));
+                    if (d.deviceId === activeDeviceId) opt.selected = true;
+                    camSelect.appendChild(opt);
+                });
+            }).catch(function () {});
+        }
+
+        /* ── Start camera ── */
+        function startCamera(deviceId) {
+            stopBarcodeScan();
+            if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+
+            statusEl.textContent = 'Connecting to camera…';
+
+            var constraints = deviceId
+                ? { video: { deviceId: { exact: deviceId } } }
+                : { video: { facingMode: { ideal: 'environment' } } };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(function (s) {
+                    stream = s;
+                    video.srcObject = s;
+                    video.hidden = false;
+                    statusEl.textContent = 'Camera ready';
+                    captureBtn.disabled = false;
+                    toggleCameraBtn.textContent = 'Stop Camera';
+
+                    var track = s.getVideoTracks()[0];
+                    var activeId = track && track.getSettings ? track.getSettings().deviceId : '';
+                    populateDevices(activeId || '');
+                    cameraActive = true;
+                    startBarcodeScan();
+                })
+                .catch(function () {
+                    statusEl.textContent = 'No camera detected';
+                    captureBtn.disabled = true;
+                    toggleCameraBtn.textContent = 'Start Camera';
+                    video.hidden = true;
+                });
+        }
+
+        /* ── Stop camera ── */
+        function stopCamera() {
+            stopBarcodeScan();
+            if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+            video.srcObject = null;
+            video.hidden = true;
+            captureBtn.disabled = true;
+            statusEl.textContent = '';
+            toggleCameraBtn.textContent = 'Start Camera';
+        }
+
+        /* ── Toggle camera button ── */
+        toggleCameraBtn.addEventListener('click', function () {
+            if (stream) { stopCamera(); } else { startCamera(camSelect.value || null); }
         });
 
+        /* ── Device picker ── */
+        camSelect.addEventListener('change', function () {
+            if (camSelect.value) startCamera(camSelect.value);
+        });
+
+        /* ── Capture button ── */
         captureBtn.addEventListener('click', function () {
             canvas.width  = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
 
-            output.textContent = 'Scanning…';
-            resultWrap.hidden = false;
+            captureBtn.disabled = true;
+            statusEl.textContent = 'Scanning…';
 
             canvas.toBlob(function (blob) {
-                var body = new FormData();
-                body.append('label_image', blob, 'capture.jpg');
-
-                fetch('/api/scan', { method: 'POST', body: body })
-                    .then(function (resp) { return resp.json(); })
+                postImage(blob, 'capture.jpg')
                     .then(function (data) {
-                        output.textContent = JSON.stringify(data, null, 4);
+                        showResults(data);
+                        statusEl.textContent = 'Done';
+                        captureBtn.disabled = false;
                     })
                     .catch(function (err) {
-                        output.textContent = 'Scan error: ' + err.message;
+                        showError('Scan error: ' + err.message);
+                        statusEl.textContent = 'Camera ready';
+                        captureBtn.disabled = false;
                     });
             }, 'image/jpeg', 0.92);
         });
 
-        stopBtn.addEventListener('click', function () {
-            if (stream) {
-                stream.getTracks().forEach(function (t) { t.stop(); });
-                stream = null;
-            }
-            video.hidden = true;
-            video.srcObject = null;
-            startBtn.hidden = false;
-            captureBtn.hidden = true;
-            stopBtn.hidden = true;
+        /* ── File upload button ── */
+        uploadBtn.addEventListener('click', function () {
+            var file = fileInput.files[0];
+            if (!file) { showError('Please select an image file first.'); return; }
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading…';
+
+            postImage(file, file.name)
+                .then(function (data) {
+                    showResults(data);
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Upload';
+                })
+                .catch(function (err) {
+                    showError('Upload error: ' + err.message);
+                    uploadBtn.disabled = false;
+                    uploadBtn.textContent = 'Upload';
+                });
         });
+
+        /* ── Auto-start camera on page load ── */
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            startCamera(null);
+        } else {
+            statusEl.textContent = 'No camera detected';
+            toggleCameraBtn.textContent = 'Start Camera';
+        }
+
+        if (!('BarcodeDetector' in window)) {
+            barcodeStatusEl.textContent = 'Live barcode detection not supported in this browser';
+            barcodeStatusEl.hidden = false;
+        }
     }());
     </script>
 </body>

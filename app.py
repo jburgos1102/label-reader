@@ -29,8 +29,8 @@ def _save_upload(uploaded_file):
     return path
 
 
-def _run_and_store(image_path):
-    internal = run(image_path)
+def _run_and_store(image_path, skip_llm=False):
+    internal = run(image_path, skip_llm=skip_llm)
     label_id = str(uuid.uuid4())
     result = build_extraction_result(internal, label_id)
     try:
@@ -93,7 +93,14 @@ def upload():
 @app.route("/api/scan", methods=["POST"])
 def api_scan():
     if "label_image" not in request.files:
-        return jsonify({"error": "No image provided. Send a multipart/form-data POST with a 'label_image' field."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "No image provided. Send a multipart/form-data POST with a 'label_image' field."
+                }
+            ),
+            400,
+        )
 
     uploaded_file = request.files["label_image"]
 
@@ -107,7 +114,7 @@ def api_scan():
         return jsonify({"error": "Unable to save the image."}), 500
 
     try:
-        result = _run_and_store(image_path)
+        result = _run_and_store(image_path, skip_llm=True)
     except Exception:
         log.exception("Unable to extract label data for /api/scan")
         return jsonify({"error": "Unable to process the image."}), 500

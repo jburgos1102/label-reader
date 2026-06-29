@@ -16,7 +16,7 @@ from tracking import (
 )
 
 
-def run(image_path):
+def run(image_path, skip_llm=False):
     """Full label extraction pipeline. Returns the internal result dict."""
     _start = time.monotonic()
 
@@ -77,10 +77,7 @@ def run(image_path):
     )
     label_data = score_label_data(label_data)
 
-    try:
-        llm_result = extract_fields_with_llm(text, label_data)
-    except Exception:
-        log.exception("OpenAI extraction failed; using the rule-based result")
+    if skip_llm:
         llm_result = {
             "recipient_name": label_data.get("recipient_name", ""),
             "street_address": label_data.get("street_address", ""),
@@ -91,8 +88,25 @@ def run(image_path):
             "carrier": label_data.get("carrier", ""),
             "llm_enabled": False,
             "llm_provider": "openai",
-            "llm_notes": "OpenAI extraction failed; using the rule-based result.",
+            "llm_notes": "LLM skipped for camera scan.",
         }
+    else:
+        try:
+            llm_result = extract_fields_with_llm(text, label_data)
+        except Exception:
+            log.exception("OpenAI extraction failed; using the rule-based result")
+            llm_result = {
+                "recipient_name": label_data.get("recipient_name", ""),
+                "street_address": label_data.get("street_address", ""),
+                "city": label_data.get("city", ""),
+                "state": label_data.get("state", ""),
+                "zip_code": label_data.get("zip_code", ""),
+                "tracking_number": label_data.get("tracking_number", ""),
+                "carrier": label_data.get("carrier", ""),
+                "llm_enabled": False,
+                "llm_provider": "openai",
+                "llm_notes": "OpenAI extraction failed; using the rule-based result.",
+            }
 
     label_data["llm_result"] = llm_result
 
