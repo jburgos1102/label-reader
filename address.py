@@ -1,5 +1,7 @@
 import re
 
+from logger import log
+
 
 def clean_physical_street_ocr(value):
     """Clean conservative OCR noise from a line that starts like an address."""
@@ -536,3 +538,495 @@ def normalize_extracted_fields(label_data):
         label_data["city"] = city
 
     return label_data
+
+
+def parse_address_from_lines(lines):
+    """Run all address parsers over OCR lines and return extracted address fields."""
+    result = {
+        "recipient_name": "",
+        "street_address": "",
+        "city": "",
+        "state": "",
+        "zip_code": "",
+        "parser_used": "",
+        "parser_matches": [],
+    }
+
+    used_deliver_to_block = False
+
+    for line_index, line in enumerate(lines):
+        if is_deliver_to_marker(line):
+
+            if "USPS" not in line.upper():
+                log.debug("Found non-USPS deliver-to marker at line %s", line_index)
+
+                for nearby_index in range(line_index, min(line_index + 6, len(lines))):
+                    log.debug(
+                        "Non-USPS deliver-to nearby line %s: %r",
+                        nearby_index,
+                        lines[nearby_index],
+                    )
+
+                if line_index + 4 < len(lines):
+                    uniuni_city_state_line = lines[line_index + 2]
+                    uniuni_street_line = lines[line_index + 3]
+                    uniuni_zip_line = lines[line_index + 4]
+
+                    log.debug("UniUni city/state candidate: %r", uniuni_city_state_line)
+                    log.debug("UniUni street candidate: %r", uniuni_street_line)
+                    log.debug("UniUni ZIP candidate: %r", uniuni_zip_line)
+
+                    uniuni_city_state_match = re.search(
+                        r"([A-Za-z]+),?\s+([A-Z]{2}),?",
+                        uniuni_city_state_line,
+                    )
+                    uniuni_street_match = re.match(r"\d+", uniuni_street_line)
+                    uniuni_zip_match = re.search(r"\d{5}", uniuni_zip_line)
+
+                    log.debug(
+                        "UniUni city/state match: %s",
+                        bool(uniuni_city_state_match),
+                    )
+                    log.debug("UniUni street match: %s", bool(uniuni_street_match))
+                    log.debug("UniUni ZIP match: %s", bool(uniuni_zip_match))
+
+                    if (
+                        uniuni_city_state_match
+                        and uniuni_street_match
+                        and uniuni_zip_match
+                    ):
+                        result["street_address"] = uniuni_street_line
+                        result["city"] = uniuni_city_state_match.group(1)
+                        result["state"] = uniuni_city_state_match.group(2)
+                        result["zip_code"] = uniuni_zip_match.group()
+                        result["parser_used"] = "uniuni_deliver_to"
+                        if "uniuni_deliver_to" not in result["parser_matches"]:
+                            result["parser_matches"].append("uniuni_deliver_to")
+
+                        used_deliver_to_block = True
+
+            log.debug("Found deliver-to marker at line %s", line_index)
+
+            if line_index + 3 < len(lines):
+                log.debug("Deliver-to block has enough lines")
+                deliver_to_name = lines[line_index + 1]
+                deliver_to_street = lines[line_index + 2]
+                deliver_to_city_line = lines[line_index + 3]
+                deliver_to_name = clean_parser_name(deliver_to_name)
+                deliver_to_street = clean_address_ocr(deliver_to_street)
+                deliver_to_city_line = clean_address_ocr(deliver_to_city_line)
+
+                log.debug("Deliver-to name: %r", deliver_to_name)
+                log.debug("Deliver-to street: %r", deliver_to_street)
+                log.debug("Deliver-to city line: %r", deliver_to_city_line)
+
+                deliver_to_city_parts = [
+                    part.strip(",")
+                    for part in deliver_to_city_line.split()
+                    if part.strip(",")
+                ]
+
+                log.debug("Deliver-to city parts: %s", deliver_to_city_parts)
+
+                if len(deliver_to_city_parts) >= 2:
+                    state_candidate = deliver_to_city_parts[-2]
+                    zip_candidate = deliver_to_city_parts[-1]
+
+                    state_match = re.fullmatch(r"[A-Z]{2}", state_candidate)
+                    zip_match = re.fullmatch(r"\d{5}", zip_candidate)
+
+                    if not (state_match and zip_match):
+                        state_candidate = deliver_to_city_parts[-1]
+                        zip_candidate = ""
+                        state_match = re.fullmatch(r"[A-Z]{2}", state_candidate)
+
+                        for previous_line in lines[max(0, line_index - 8) : line_index]:
+                            previous_zip_match = re.search(
+                                r"\bSHIP\s+USPS\s+(\d{5})\b",
+                                previous_line,
+                                re.IGNORECASE,
+                            )
+
+                            if previous_zip_match:
+                                zip_candidate = previous_zip_match.group(1)
+                                break
+
+                        zip_match = re.fullmatch(r"\d{5}", zip_candidate)
+
+                    log.debug("Deliver-to state match: %s", bool(state_match))
+                    log.debug("Deliver-to ZIP match: %s", bool(zip_match))
+
+                    if state_match and zip_match:
+                        if deliver_to_city_parts[-1] == zip_candidate:
+                            deliver_to_city = " ".join(deliver_to_city_parts[:-2])
+                        else:
+                            deliver_to_city = " ".join(deliver_to_city_parts[:-1])
+
+                        deliver_to_city = deliver_to_city.strip(",")
+
+                        result["recipient_name"] = deliver_to_name
+                        result["street_address"] = deliver_to_street
+                        result["city"] = deliver_to_city
+                        result["state"] = state_candidate
+                        result["zip_code"] = zip_candidate
+                        result["parser_used"] = "deliver_to"
+                        if "deliver_to" not in result["parser_matches"]:
+                            result["parser_matches"].append("deliver_to")
+
+                        used_deliver_to_block = True
+
+        if used_deliver_to_block:
+            continue
+
+        parts = line.split()
+
+        city_first_match = re.fullmatch(
+            r"([A-Za-z][A-Za-z .'-]*?),?\s+([A-Z]{2})\s+(\d{5}(?:\s*[-–—]\s*\d{4})?)",
+            clean_address_ocr(line),
+        )
+
+        if city_first_match and line_index == 0:
+            for nearby_index in range(line_index + 1, min(line_index + 12, len(lines))):
+                if re.search(
+                    r"\b(?:USPS\s+)?TRACKING\b",
+                    lines[nearby_index],
+                    re.IGNORECASE,
+                ):
+                    break
+
+                if re.match(r"^\s*TO\b", lines[nearby_index], re.IGNORECASE):
+                    if nearby_index + 1 < len(lines):
+                        possible_street = clean_address_ocr(lines[nearby_index + 1])
+
+                        if re.search(r"\d", possible_street) and not re.search(
+                            r"\b(?:USPS\s+)?TRACKING\b",
+                            possible_street,
+                            re.IGNORECASE,
+                        ):
+                            result["recipient_name"] = ""
+                            result["street_address"] = possible_street
+                            result["city"] = city_first_match.group(1).strip(",")
+                            result["state"] = city_first_match.group(2)
+                            result["zip_code"] = re.sub(
+                                r"\s*[-–—]\s*",
+                                "-",
+                                city_first_match.group(3),
+                            )
+                            result["parser_used"] = "city_first_to_address"
+                            if "city_first_to_address" not in result["parser_matches"]:
+                                result["parser_matches"].append("city_first_to_address")
+
+                            break
+
+        if "18974" in line:
+            log.debug("ZIP-first parts: %s", parts)
+
+        if len(parts) >= 6:
+            zip_match = re.fullmatch(r"\d{5}", parts[0])
+            separator_match = re.fullmatch(r"[-–—]", parts[1])
+            plus_four_match = re.fullmatch(r"\d{4}", parts[2])
+            state_match = re.fullmatch(r"[A-Z]{2}", parts[5])
+
+            log.debug("ZIP-first ZIP match: %s", bool(zip_match))
+            log.debug("ZIP-first plus-four match: %s", bool(plus_four_match))
+            log.debug("ZIP-first state match: %s", bool(state_match))
+
+            if zip_match and plus_four_match and state_match and line_index >= 3:
+                result["recipient_name"] = lines[line_index - 3]
+                result["street_address"] = lines[line_index - 1]
+                result["city"] = parts[3]
+                result["state"] = parts[5]
+                result["zip_code"] = parts[0] + "-" + parts[2]
+                result["parser_used"] = "zip_first_spaced"
+                if "zip_first_spaced" not in result["parser_matches"]:
+                    result["parser_matches"].append("zip_first_spaced")
+
+        if len(parts) >= 4:
+            zip_first_match = re.fullmatch(r"(\d{5})[-–—](\d{4})", parts[0])
+            state_match = re.fullmatch(r"[A-Z]{2}", parts[3])
+
+            log.debug("ZIP-first combined ZIP match: %s", bool(zip_first_match))
+            log.debug("ZIP-first combined state match: %s", bool(state_match))
+
+            if zip_first_match and state_match and line_index >= 2:
+                result["recipient_name"] = lines[line_index - 2]
+                result["street_address"] = lines[line_index - 1]
+                result["city"] = parts[1]
+                result["state"] = parts[3]
+                result["zip_code"] = (
+                    zip_first_match.group(1) + "-" + zip_first_match.group(2)
+                )
+                result["parser_used"] = "zip_first_combined"
+                if "zip_first_combined" not in result["parser_matches"]:
+                    result["parser_matches"].append("zip_first_combined")
+
+        country_zip_match = re.fullmatch(
+            r"(.+?),\s*([A-Z]{2}),\s*(?:US|USA),?\s*(\d{5})",
+            line,
+            re.IGNORECASE,
+        )
+
+        if country_zip_match:
+            log.debug("City/state/country/ZIP match: %s", country_zip_match.groups())
+
+            if line_index - 2 >= 0:
+                result["recipient_name"] = lines[line_index - 2]
+                result["street_address"] = lines[line_index - 1]
+                result["city"] = country_zip_match.group(1).strip()
+                result["state"] = country_zip_match.group(2).upper()
+                result["zip_code"] = country_zip_match.group(3)
+                result["parser_used"] = "city_state_country_zip"
+                if "city_state_country_zip" not in result["parser_matches"]:
+                    result["parser_matches"].append("city_state_country_zip")
+
+        college_mailroom_match = re.fullmatch(
+            r"([A-Za-z][A-Za-z .'-]*?),?\s+([A-Z]{2})\s+(\d{5}(?:\s*[-–—]\s*\d{4})?)(?:\s+UNITED STATES)?\W*",
+            line,
+        )
+
+        if college_mailroom_match and line_index >= 2:
+            city = college_mailroom_match.group(1).strip().strip(",")
+            state = college_mailroom_match.group(2)
+            zip_code = re.sub(
+                r"\s*[-–—]\s*",
+                "-",
+                college_mailroom_match.group(3),
+            )
+
+            previous_lines = lines[:line_index]
+            mailroom_keywords = (
+                "COLLEGE",
+                "HUB",
+                "UNIVERSITY",
+                "PENN STATER",
+                "ALUMNI CENTER",
+            )
+            previous_text = " ".join(previous_lines).upper()
+            college_city_match = city.upper() in ("CARLISLE", "UNIVERSITY PARK")
+            college_context_match = any(
+                keyword in previous_text for keyword in mailroom_keywords
+            )
+
+            log.debug(
+                "College mailroom city/state/ZIP match: %s",
+                college_mailroom_match.groups(),
+            )
+            log.debug(
+                "College mailroom context: city=%s context=%s",
+                college_city_match,
+                college_context_match,
+            )
+
+            if college_city_match or college_context_match:
+                address_end_index = line_index - 1
+
+                if re.fullmatch(r"\d{2,5}", lines[address_end_index]):
+                    address_end_index -= 1
+
+                address_start_index = address_end_index
+
+                # Build the address from the contiguous mailroom/street lines above
+                # city/state/ZIP, stopping before the recipient line.
+                while address_start_index - 1 >= 0:
+                    previous_line = lines[address_start_index - 1]
+                    previous_upper = previous_line.upper()
+
+                    if any(
+                        keyword in previous_upper for keyword in mailroom_keywords
+                    ) or re.search(r"\bP\.?\s*O\.?\s+BOX\b", previous_upper):
+                        address_start_index -= 1
+                    else:
+                        break
+
+                address_lines = lines[address_start_index : address_end_index + 1]
+
+                recipient_name = choose_recipient_from_lines(
+                    lines,
+                    address_start_index - 1,
+                    max(0, address_start_index - 4),
+                )
+
+                first_address_line = address_lines[0] if address_lines else ""
+                ship_recipient_name, ship_hub_part = split_ship_recipient_and_hub(
+                    first_address_line
+                )
+                drop_split_ship_hub = False
+
+                if ship_recipient_name:
+                    recipient_name = ship_recipient_name
+
+                    has_dickinson_address_line = any(
+                        re.search(
+                            r"\bDICKINSON\s+COLLEGE\b.*\bN\s+COLLEGE\b",
+                            address_line,
+                            re.IGNORECASE,
+                        )
+                        for address_line in address_lines[1:]
+                    )
+
+                    if has_dickinson_address_line:
+                        address_lines = address_lines[1:]
+                        drop_split_ship_hub = True
+                    else:
+                        address_lines[0] = ship_hub_part
+
+                clean_address_lines = []
+
+                for address_line in address_lines:
+                    if (
+                        drop_split_ship_hub
+                        and re.fullmatch(
+                            r"\s*TO\s*:\s*ST\s*",
+                            address_line,
+                            flags=re.IGNORECASE,
+                        )
+                    ):
+                        continue
+
+                    address_line = re.sub(
+                        r"^\s*(?:TO|SHIP)\s*:\s*",
+                        "",
+                        address_line,
+                        flags=re.IGNORECASE,
+                    )
+                    address_line = re.sub(
+                        r"^\s*IP\s+UB\b",
+                        "HUB",
+                        address_line,
+                        flags=re.IGNORECASE,
+                    )
+                    address_line = re.sub(
+                        r"^(\d+)\s*N,\s+",
+                        r"\1 N. ",
+                        address_line,
+                        flags=re.IGNORECASE,
+                    )
+                    address_line = clean_address_ocr(address_line)
+
+                    if address_line:
+                        clean_address_lines.append(address_line)
+
+                recipient_name = clean_parser_name(recipient_name)
+
+                if is_noise_recipient_line(recipient_name):
+                    recipient_name = ""
+
+                result["recipient_name"] = recipient_name
+                result["street_address"] = " ".join(clean_address_lines)
+                result["city"] = city
+                result["state"] = state
+                result["zip_code"] = zip_code
+                result["parser_used"] = "college_mailroom_parser"
+                if "college_mailroom_parser" not in result["parser_matches"]:
+                    result["parser_matches"].append("college_mailroom_parser")
+
+        if result["parser_used"] == "college_mailroom_parser":
+            continue
+
+        for index, part in enumerate(parts):
+            state_match = re.fullmatch(r"[A-Z]{2}", part)
+
+            if state_match and index + 1 < len(parts):
+                zip_part = parts[index + 1]
+
+                zip_match = re.fullmatch(r"(\d{5})[-–—]?(\d{4})?", zip_part)
+
+                if zip_match and line_index >= 2:
+                    zip_code = zip_match.group(1)
+                    zip_plus_four = zip_match.group(2)
+
+                    if not zip_plus_four and index + 3 < len(parts):
+                        possible_separator = parts[index + 2]
+                        possible_plus_four = parts[index + 3]
+
+                        separator_match = re.fullmatch(r"[-–—]", possible_separator)
+                        plus_four_match = re.fullmatch(r"\d{4}", possible_plus_four)
+
+                        if separator_match and plus_four_match:
+                            zip_plus_four = possible_plus_four
+
+                    city_parts = parts[:index]
+                    clean_city_parts = []
+
+                    for city_part in city_parts:
+                        if any(character.isalnum() for character in city_part):
+                            clean_city_parts.append(city_part)
+
+                    city = " ".join(clean_city_parts).strip(",")
+                    state = part
+
+                    street_address_line = lines[line_index - 1]
+                    street_address_parts = street_address_line.split()
+
+                    house_number_index = 0
+
+                    for address_index, address_part in enumerate(street_address_parts):
+                        if address_part.isdigit():
+                            house_number_index = address_index
+                            break
+
+                    street_address = " ".join(street_address_parts[house_number_index:])
+
+                    recipient_name_line = lines[line_index - 2]
+                    recipient_name_parts = recipient_name_line.split()
+
+                    recipient_name_index = 0
+
+                    for name_index, name_part in enumerate(recipient_name_parts):
+                        if name_part.isalpha():
+                            recipient_name_index = name_index
+                            break
+
+                    clean_recipient_name_parts = [
+                        part
+                        for part in recipient_name_parts[recipient_name_index:]
+                        if part.isalpha()
+                    ]
+
+                    full_zip = (
+                        zip_code + "-" + zip_plus_four if zip_plus_four else zip_code
+                    )
+
+                    result["recipient_name"] = " ".join(clean_recipient_name_parts)
+                    result["street_address"] = street_address
+                    result["city"] = city
+                    result["state"] = state
+                    result["zip_code"] = full_zip
+                    result["parser_used"] = "generic_city_state_zip"
+                    if "generic_city_state_zip" not in result["parser_matches"]:
+                        result["parser_matches"].append("generic_city_state_zip")
+
+    # Explicit TO: lines override parser-derived recipient when the parser result is
+    # noise, missing, or a mailroom/hub reference rather than a person name.
+    explicit_to_recipient = find_explicit_to_person_name(lines)
+    current_recipient = result.get("recipient_name", "")
+    current_recipient_upper = current_recipient.upper()
+    current_recipient_tokens = re.findall(r"[A-Za-z]+", current_recipient)
+
+    if explicit_to_recipient and (
+        not current_recipient
+        or is_noise_recipient_line(current_recipient)
+        or re.search(r"\b(?:HUB|DICKINSON\s*COLLEGE)\b", current_recipient_upper)
+        or len(current_recipient_tokens) < 2
+    ):
+        result["recipient_name"] = explicit_to_recipient
+
+    if not result["recipient_name"]:
+        fallback_recipient = find_recipient_name_fallback(lines)
+        if fallback_recipient:
+            result["recipient_name"] = fallback_recipient
+
+    result["street_address"] = reconstruct_college_mailroom_street(
+        lines,
+        result["street_address"],
+    )
+    penn_state = recover_penn_state_address(
+        lines,
+        result["street_address"],
+        result["city"],
+        result["state"],
+        result["zip_code"],
+    )
+    result.update(penn_state)
+
+    return result
