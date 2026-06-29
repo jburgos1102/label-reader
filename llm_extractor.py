@@ -7,6 +7,8 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
+import config
+
 
 load_dotenv()
 
@@ -69,9 +71,9 @@ def extract_fields_with_llm(text: str, rule_result: dict[str, Any]) -> dict[str,
         )
 
     try:
-        client = OpenAI(api_key=api_key, timeout=30.0)
+        client = OpenAI(api_key=api_key, timeout=config.OPENAI_TIMEOUT)
         response = client.responses.create(
-            model="gpt-5",
+            model=config.OPENAI_MODEL,
             instructions=(
                 "Extract recipient shipping fields from the supplied OCR text, correcting "
                 "only obvious OCR spacing and label-noise errors. OCR may drop the first "

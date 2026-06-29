@@ -17,100 +17,12 @@ from barcodes import extract_tracking_number
 from llm_extractor import extract_fields_with_llm
 from logger import log
 from ocr import get_best_ocr_text
+from scoring import normalize_comparison_value, score_label_data
 from tracking import (
     extract_tracking_from_ocr_lines,
     identify_carrier,
     identify_carrier_with_context,
 )
-
-
-def normalize_comparison_value(value):
-    normalized = str(value or "").upper().strip()
-    normalized = re.sub(r"[^\w\s]", "", normalized)
-    return " ".join(normalized.split())
-
-
-# --- SCORING FUNCTION ---
-def score_label_data(label_data):
-    confidence = {
-        "recipient_name": 0.0,
-        "street_address": 0.0,
-        "city": 0.0,
-        "state": 0.0,
-        "zip_code": 0.0,
-        "tracking_number": 0.0,
-        "overall": 0.0,
-    }
-    warnings = []
-
-    tracking_number = label_data.get("tracking_number", "")
-    recipient_name = label_data.get("recipient_name", "")
-    street_address = label_data.get("street_address", "")
-    city = label_data.get("city", "")
-    state = label_data.get("state", "")
-    zip_code = label_data.get("zip_code", "")
-
-    if tracking_number:
-        if len(tracking_number) >= 15:
-            confidence["tracking_number"] = 0.95
-        else:
-            confidence["tracking_number"] = 0.40
-            warnings.append("tracking_number_short")
-    else:
-        warnings.append("tracking_number_missing")
-
-    if recipient_name:
-        if re.fullmatch(r"[A-Za-z][A-Za-z .'-]+", recipient_name):
-            confidence["recipient_name"] = 0.85
-        else:
-            confidence["recipient_name"] = 0.45
-            warnings.append("recipient_name_low_confidence")
-    else:
-        warnings.append("recipient_name_missing")
-
-    if street_address:
-        if re.search(r"\d", street_address):
-            confidence["street_address"] = 0.85
-        else:
-            confidence["street_address"] = 0.45
-            warnings.append("street_address_missing_number")
-    else:
-        warnings.append("street_address_missing")
-
-    if city:
-        if re.fullmatch(r"[A-Za-z .'-]+", city):
-            confidence["city"] = 0.85
-        else:
-            confidence["city"] = 0.45
-            warnings.append("city_low_confidence")
-    else:
-        warnings.append("city_missing")
-
-    if re.fullmatch(r"[A-Z]{2}", state):
-        confidence["state"] = 0.95
-    else:
-        warnings.append("state_missing_or_invalid")
-
-    if re.fullmatch(r"\d{5}(-\d{4})?", zip_code):
-        confidence["zip_code"] = 0.95
-    else:
-        warnings.append("zip_code_missing_or_invalid")
-
-    field_scores = [
-        confidence["recipient_name"],
-        confidence["street_address"],
-        confidence["city"],
-        confidence["state"],
-        confidence["zip_code"],
-        confidence["tracking_number"],
-    ]
-
-    confidence["overall"] = round(sum(field_scores) / len(field_scores), 2)
-
-    label_data["confidence"] = confidence
-    label_data["warnings"] = warnings
-
-    return label_data
 
 
 def extract_label_data(image_path):
