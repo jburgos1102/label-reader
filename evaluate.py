@@ -12,6 +12,7 @@ if not EVALUATE_LLM:
 
 from label_reader import extract_label_data
 from ocr import get_last_ocr_diagnostics
+from pipeline import build_extraction_result
 
 DATASETS_DIR = Path("datasets")
 GOLD_SET_PATH = DATASETS_DIR / "gold_set.txt"
@@ -497,35 +498,34 @@ def main():
                     f"actual={actual_data.get(field, '')!r}"
                 )
 
-        selected_result = actual_data.get("selected_result")
-        if not isinstance(selected_result, dict):
-            selected_labels_skipped += 1
-        else:
-            selected_labels_scored += 1
+        extraction_result = build_extraction_result(actual_data, "eval")
+        extracted = extraction_result.to_dict()["extracted"]
+        selected_labels_scored += 1
 
-            for field in FIELDS_TO_COMPARE:
-                if not has_ground_truth(expected_data, field):
-                    continue
+        for field in FIELDS_TO_COMPARE:
+            if not has_ground_truth(expected_data, field):
+                continue
 
-                selected_field_totals[field] += 1
-                passed = compare_field(selected_result, expected_data, field)
+            selected_field_totals[field] += 1
+            field_value = extracted.get(field, {}).get("value", "")
+            passed = compare_field({field: field_value}, expected_data, field)
 
-                if is_gold_label:
-                    gold_selected_totals[field] += 1
-                    if passed:
-                        gold_selected_correct[field] += 1
-
+            if is_gold_label:
+                gold_selected_totals[field] += 1
                 if passed:
-                    selected_field_passes[field] += 1
-                else:
-                    selected_failures.append(
-                        {
-                            "label": str(image_path),
-                            "field": field,
-                            "expected": expected_data.get(field, ""),
-                            "actual": selected_result.get(field, ""),
-                        }
-                    )
+                    gold_selected_correct[field] += 1
+
+            if passed:
+                selected_field_passes[field] += 1
+            else:
+                selected_failures.append(
+                    {
+                        "label": str(image_path),
+                        "field": field,
+                        "expected": expected_data.get(field, ""),
+                        "actual": field_value,
+                    }
+                )
 
         if not EVALUATE_LLM:
             continue

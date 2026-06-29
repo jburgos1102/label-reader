@@ -50,6 +50,10 @@
             background: var(--panel);
         }
 
+        .panel + .panel {
+            margin-top: 24px;
+        }
+
         .section-title {
             margin: 0 0 10px;
             font-size: 22px;
@@ -108,6 +112,16 @@
             background: var(--accent-hover);
         }
 
+        button.secondary {
+            background: var(--row);
+            border: 1px solid var(--row-border);
+        }
+
+        button.secondary:hover,
+        button.secondary:focus-visible {
+            background: #3a3535;
+        }
+
         .error {
             margin: 0 0 12px;
             color: var(--danger);
@@ -126,6 +140,27 @@
             font-size: 14px;
             line-height: 1.45;
             white-space: pre-wrap;
+        }
+
+        /* Camera section */
+        .camera-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        #camera-preview {
+            display: block;
+            width: 100%;
+            max-height: 360px;
+            object-fit: contain;
+            background: #000;
+            margin-bottom: 16px;
+        }
+
+        .camera-output-header {
+            margin: 20px 0 10px;
         }
 
         @media (max-width: 620px) {
@@ -187,56 +222,89 @@
                 <pre>{}</pre>
             {% endif %}
         </section>
+
+        <section class="panel" aria-labelledby="camera-title">
+            <h2 class="section-title" id="camera-title">Camera Scan</h2>
+            <p class="helper-text">Hold the label in front of your camera, then click Capture &amp; Scan.</p>
+
+            <div class="camera-controls">
+                <button type="button" id="start-camera">Start Camera</button>
+                <button type="button" id="capture-btn" hidden>Capture &amp; Scan</button>
+                <button type="button" id="stop-camera" class="secondary" hidden>Stop Camera</button>
+            </div>
+
+            <video id="camera-preview" autoplay playsinline hidden></video>
+            <canvas id="camera-canvas" hidden></canvas>
+
+            <div id="camera-result-wrapper" hidden>
+                <h2 class="section-title camera-output-header">Scan Result</h2>
+                <pre id="camera-output"></pre>
+            </div>
+        </section>
     </main>
+
+    <script>
+    (function () {
+        var video   = document.getElementById('camera-preview');
+        var canvas  = document.getElementById('camera-canvas');
+        var startBtn   = document.getElementById('start-camera');
+        var captureBtn = document.getElementById('capture-btn');
+        var stopBtn    = document.getElementById('stop-camera');
+        var resultWrap = document.getElementById('camera-result-wrapper');
+        var output  = document.getElementById('camera-output');
+        var stream  = null;
+
+        startBtn.addEventListener('click', function () {
+            navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: 'environment' } }
+            }).then(function (s) {
+                stream = s;
+                video.srcObject = stream;
+                video.hidden = false;
+                startBtn.hidden = true;
+                captureBtn.hidden = false;
+                stopBtn.hidden = false;
+            }).catch(function (err) {
+                output.textContent = 'Camera error: ' + err.message;
+                resultWrap.hidden = false;
+            });
+        });
+
+        captureBtn.addEventListener('click', function () {
+            canvas.width  = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            output.textContent = 'Scanning…';
+            resultWrap.hidden = false;
+
+            canvas.toBlob(function (blob) {
+                var body = new FormData();
+                body.append('label_image', blob, 'capture.jpg');
+
+                fetch('/api/scan', { method: 'POST', body: body })
+                    .then(function (resp) { return resp.json(); })
+                    .then(function (data) {
+                        output.textContent = JSON.stringify(data, null, 4);
+                    })
+                    .catch(function (err) {
+                        output.textContent = 'Scan error: ' + err.message;
+                    });
+            }, 'image/jpeg', 0.92);
+        });
+
+        stopBtn.addEventListener('click', function () {
+            if (stream) {
+                stream.getTracks().forEach(function (t) { t.stop(); });
+                stream = null;
+            }
+            video.hidden = true;
+            video.srcObject = null;
+            startBtn.hidden = false;
+            captureBtn.hidden = true;
+            stopBtn.hidden = true;
+        });
+    }());
+    </script>
 </body>
 </html>
-
-<!-- <!DOCTYPE html>
-<html>
-<head>
-    <title>Label Reader POC</title>
-</head>
-    <style>
-        body {
-            padding: 10px 40px 20px 40px;
-        }
-    </style>
-</head>
-<body>
-
-    <h1>Label Reader POC</h1>
-
-    <p>Upload a shipping label image.</p>
-
-    <form
-        action="/upload"
-        method="POST"
-        enctype="multipart/form-data"
-    >
-        <input
-            type="file"
-            name="label_image"
-            accept="image/*"
-        >
-
-        <button type="submit">
-            Upload
-        </button>
-    </form>
-
-    <h2>JSON Output</h2>
-
-    {% if error_message %}
-        <p style="color:red;">
-            {{ error_message }}
-        </p>
-    {% endif %}
-
-    {% if label_data %}
-        <pre>{{ label_data }}</pre>
-    {% else %}
-        <pre>{}</pre>
-    {% endif %}
-
-</body>
-</html> -->

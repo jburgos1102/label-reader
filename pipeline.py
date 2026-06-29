@@ -1,9 +1,12 @@
+import time
+
 from PIL import Image
 
 from address import normalize_extracted_fields, parse_address_from_lines
 from barcodes import extract_tracking_number
 from llm_extractor import extract_fields_with_llm
 from logger import log
+from models import EXTRACTION_FIELDS, ExtractionResult, FieldValue
 from ocr import get_best_ocr_text
 from scoring import normalize_comparison_value, score_label_data
 from tracking import (
@@ -15,13 +18,15 @@ from tracking import (
 
 def run(image_path):
     """Full label extraction pipeline. Returns the internal result dict."""
+    _start = time.monotonic()
+
     image = Image.open(image_path)
     image = image.convert("RGB")
 
-    tracking_number = extract_tracking_number(image)
+    barcode_tracking = extract_tracking_number(image)
     label_data = {
-        "tracking_number": tracking_number,
-        "carrier": identify_carrier(tracking_number),
+        "tracking_number": barcode_tracking,
+        "carrier": identify_carrier(barcode_tracking),
     }
 
     text = get_best_ocr_text(image)
@@ -52,6 +57,16 @@ def run(image_path):
         ):
             label_data["tracking_number"] = ocr_tracking_candidate
             label_data["carrier"] = identify_carrier(ocr_tracking_candidate)
+
+    final_tracking = label_data["tracking_number"]
+    if final_tracking and final_tracking == barcode_tracking:
+        tracking_source = "barcode"
+    elif final_tracking and final_tracking == ocr_tracking_candidate:
+        tracking_source = "ocr"
+    elif final_tracking:
+        tracking_source = "rule"
+    else:
+        tracking_source = "blank"
 
     label_data.update(parse_address_from_lines(lines))
 
@@ -124,4 +139,54 @@ def run(image_path):
 
     label_data["comparison"] = comparison
 
+    label_data["_ocr_text"] = text
+    label_data["_tracking_source"] = tracking_source
+    label_data["_processing_ms"] = round((time.monotonic() - _start) * 1000)
+
     return label_data
+
+
+def build_extraction_result(internal, label_id):
+    """Convert a pipeline.run() internal dict to a typed ExtractionResult."""
+    confidence = internal.get("confidence", {})
+    tracking_source = internal.get("_tracking_source", "rule")
+    selected_sources = internal.get("selected_result", {}).get("source", {})
+    llm_result = internal.get("llm_result", {})
+    llm_called = bool(isinstance(llm_result, dict) and llm_result.get("llm_enabled"))
+    processing_ms = internal.get("_processing_ms", 0)
+
+    conflicts = []
+    if llm_called:
+        for field, cmp in internal.get("comparison", {}).items():
+            if field in EXTRACTION_FIELDS and not cmp.get("agreement") and cmp.get("openai"):
+                conflicts.append(field)
+
+    tracking_confidence = confidence.get("tracking_number", 0.0)
+
+    def _fv(name):
+        value = internal.get(name, "")
+        conf = confidence.get(name, 0.0)
+        if name == "carrier":
+            conf = tracking_confidence
+        if not value:
+            source = "blank"
+        elif name == "tracking_number":
+            source = tracking_source
+        else:
+            raw = selected_sources.get(name, "rule_based")
+            source = "agreement" if raw == "agreement" else "rule"
+        return FieldValue(value=value, confidence=conf, source=source)
+
+    return ExtractionResult(
+        label_id=label_id,
+        recipient_name=_fv("recipient_name"),
+        street_address=_fv("street_address"),
+        city=_fv("city"),
+        state=_fv("state"),
+        zip_code=_fv("zip_code"),
+        tracking_number=_fv("tracking_number"),
+        carrier=_fv("carrier"),
+        llm_called=llm_called,
+        conflicts=conflicts,
+        processing_ms=processing_ms,
+    )
