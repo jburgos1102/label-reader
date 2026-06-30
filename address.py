@@ -2,6 +2,12 @@ import re
 
 from logger import log
 
+_STREET_REJECT_WORDS = re.compile(
+    r"\b(?:CARRIER|LEAVE|RESPONSE|USPS|UPS|PARCEL|SELECT|TRACKING|"
+    r"POSTAGE|DELIVERED|DELIVER)\b",
+    re.IGNORECASE,
+)
+
 
 def clean_physical_street_ocr(value):
     """Clean conservative OCR noise from a line that starts like an address."""
@@ -512,7 +518,11 @@ def normalize_extracted_fields(label_data):
             flags=re.IGNORECASE,
         )
 
-        label_data["street_address"] = street_address
+        if _STREET_REJECT_WORDS.search(street_address):
+            label_data["street_address"] = ""
+            label_data["_street_rejected"] = True
+        else:
+            label_data["street_address"] = street_address
 
     if tracking_number:
         tracking_number = tracking_number.strip()

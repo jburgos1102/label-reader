@@ -122,7 +122,7 @@ def run(image_path, skip_llm=False):
     llm_available = isinstance(llm_result, dict) and bool(
         llm_result.get("llm_enabled")
     )
-    selected_result = {field: label_data.get(field, "") for field in selected_fields}
+    selected_result = {}
     selected_sources = {}
 
     for field in selected_fields:
@@ -131,7 +131,13 @@ def run(image_path, skip_llm=False):
         values_agree = llm_available and normalize_comparison_value(
             rule_based_value
         ) == normalize_comparison_value(openai_value)
-        selected_sources[field] = "agreement" if values_agree else "rule_based"
+
+        if not rule_based_value and llm_available and openai_value:
+            selected_result[field] = openai_value
+            selected_sources[field] = "llm"
+        else:
+            selected_result[field] = rule_based_value
+            selected_sources[field] = "agreement" if values_agree else "rule_based"
 
     selected_result["source"] = selected_sources
     label_data["selected_result"] = selected_result
@@ -178,17 +184,27 @@ def build_extraction_result(internal, label_id):
     tracking_confidence = confidence.get("tracking_number", 0.0)
 
     def _fv(name):
-        value = internal.get(name, "")
+        rule_value = internal.get(name, "")
+        sel_value = internal.get("selected_result", {}).get(name, "")
+        value = rule_value or sel_value
         conf = confidence.get(name, 0.0)
         if name == "carrier":
             conf = tracking_confidence
         if not value:
-            source = "blank"
+            if name == "street_address" and internal.get("_street_rejected"):
+                source = "rejected_rule"
+            else:
+                source = "blank"
         elif name == "tracking_number":
             source = tracking_source
         else:
             raw = selected_sources.get(name, "rule_based")
-            source = "agreement" if raw == "agreement" else "rule"
+            if raw == "agreement":
+                source = "agreement"
+            elif raw == "llm":
+                source = "llm"
+            else:
+                source = "rule"
         return FieldValue(value=value, confidence=conf, source=source)
 
     return ExtractionResult(
