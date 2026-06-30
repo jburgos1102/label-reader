@@ -2,6 +2,8 @@ import pytesseract
 from pytesseract import Output
 import re
 
+from PIL import Image
+
 import config
 from logger import log
 
@@ -137,6 +139,12 @@ def get_best_ocr_text(image):
     score is returned (existing fallback behaviour).
     """
     global _last_ocr_diagnostics
+
+    if max(image.size) > config.OCR_MAX_IMAGE_PX:
+        scale = config.OCR_TARGET_IMAGE_PX / max(image.size)
+        new_size = (round(image.width * scale), round(image.height * scale))
+        image = image.resize(new_size, Image.Resampling.LANCZOS)
+        log.debug("OCR image resized to %s", image.size)
 
     best_text = ""
     best_score = -1

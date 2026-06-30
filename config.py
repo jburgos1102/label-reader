@@ -47,3 +47,7 @@ CONFIDENCE_TRACKING_CHECKSUM_FAIL = 0.30  # tracking number failed checksum vali
 
 # OCR early-exit threshold — stop rotation loop once this confidence is reached
 OCR_CONFIDENCE_EARLY_EXIT = 75
+
+# OCR image size cap — only resizes truly enormous captures (e.g. >4500px)
+OCR_MAX_IMAGE_PX = 4500      # trigger: longest edge must exceed this to resize
+OCR_TARGET_IMAGE_PX = 4032   # target longest edge after proportional resize
