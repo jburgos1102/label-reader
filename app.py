@@ -29,12 +29,22 @@ def _save_upload(uploaded_file):
     return path
 
 
-def _run_and_store(image_path, skip_llm=False):
+def _run_and_store(image_path, skip_llm=False, original_filename=None):
     internal = run(image_path, skip_llm=skip_llm)
     label_id = str(uuid.uuid4())
     result = build_extraction_result(internal, label_id)
     try:
-        storage.store(result, ocr_text=internal.get("_ocr_text", ""))
+        with open(image_path, "rb") as f:
+            image_bytes = f.read()
+        storage.store(
+            result,
+            ocr_text=internal.get("_ocr_text", ""),
+            image_bytes=image_bytes,
+            original_filename=original_filename,
+            barcode_raw=internal.get("_barcode_raw", ""),
+            ocr_confidence=internal.get("_ocr_confidence"),
+            ocr_rotations=internal.get("_ocr_rotations_tried"),
+        )
     except Exception:
         log.warning("Failed to persist label %s to storage", label_id)
     return result
@@ -74,7 +84,7 @@ def upload():
         )
 
     try:
-        result = _run_and_store(image_path)
+        result = _run_and_store(image_path, original_filename=uploaded_file.filename)
     except Exception:
         log.exception("Unable to extract label data from uploaded file")
         return render_template(
@@ -114,12 +124,20 @@ def api_scan():
         return jsonify({"error": "Unable to save the image."}), 500
 
     try:
-        result = _run_and_store(image_path, skip_llm=True)
+        result = _run_and_store(image_path, skip_llm=True, original_filename=None)
     except Exception:
         log.exception("Unable to extract label data for /api/scan")
         return jsonify({"error": "Unable to process the image."}), 500
 
     return jsonify(result.to_dict())
+
+
+@app.route("/labels/<label_id>", methods=["GET"])
+def get_label(label_id):
+    label = storage.get_label(label_id)
+    if label is None:
+        return jsonify({"error": "Label not found."}), 404
+    return jsonify(label)
 
 
 if __name__ == "__main__":

@@ -31,6 +31,7 @@ CONFIDENCE_LLM_OCR_MISMATCH = 0.75   # value absent from OCR but plausible (visi
 
 # SQLite storage
 STORAGE_DB_PATH = "label_storage.db"
+CAPTURES_DIR = "captures"  # saved label images, named {label_id}.jpg
 
 # Camera label detection
 CAMERA_MIN_AREA_RATIO = 0.10

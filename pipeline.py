@@ -5,7 +5,7 @@ from PIL import Image
 
 import config
 from address import normalize_extracted_fields, parse_address_from_lines
-from barcodes import extract_tracking_number
+from barcodes import extract_tracking_number, get_last_raw_barcodes
 from llm_extractor import extract_fields_with_llm
 from logger import log
 from models import EXTRACTION_FIELDS, ExtractionResult, FieldValue
@@ -32,12 +32,13 @@ def run(image_path, skip_llm=False):
     image_bytes = _buf.getvalue()
 
     barcode_tracking = extract_tracking_number(image)
+    barcode_raw = "|".join(get_last_raw_barcodes())
     label_data = {
         "tracking_number": barcode_tracking,
         "carrier": identify_carrier(barcode_tracking),
     }
 
-    ocr_text, ocr_confidence = get_best_ocr_text(image)
+    ocr_text, ocr_confidence, ocr_rotations_tried = get_best_ocr_text(image)
     lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
 
     log.debug("Raw OCR text:\n%s", ocr_text)
@@ -227,6 +228,8 @@ def run(image_path, skip_llm=False):
 
     label_data["_ocr_text"] = ocr_text
     label_data["_ocr_confidence"] = ocr_confidence
+    label_data["_ocr_rotations_tried"] = ocr_rotations_tried
+    label_data["_barcode_raw"] = barcode_raw
     label_data["_llm_mode"] = llm_mode
     label_data["_tracking_source"] = tracking_source
     label_data["_processing_ms"] = round((time.monotonic() - _start) * 1000)
@@ -242,6 +245,7 @@ def build_extraction_result(internal, label_id):
     llm_result = internal.get("llm_result", {})
     llm_called = bool(isinstance(llm_result, dict) and llm_result.get("llm_enabled"))
     llm_mode = internal.get("_llm_mode", "none")
+    ocr_rotations_tried = internal.get("_ocr_rotations_tried", 4)
     processing_ms = internal.get("_processing_ms", 0)
 
     # Only flag a conflict when both rule and LLM produced real, differing values.
@@ -305,4 +309,5 @@ def build_extraction_result(internal, label_id):
         conflicts=conflicts,
         processing_ms=processing_ms,
         llm_mode=llm_mode,
+        ocr_rotations_tried=ocr_rotations_tried,
     )
