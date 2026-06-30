@@ -1,7 +1,9 @@
+import io
 import time
 
 from PIL import Image
 
+import config
 from address import normalize_extracted_fields, parse_address_from_lines
 from barcodes import extract_tracking_number
 from llm_extractor import extract_fields_with_llm
@@ -23,16 +25,22 @@ def run(image_path, skip_llm=False):
     image = Image.open(image_path)
     image = image.convert("RGB")
 
+    # Retain JPEG bytes for optional vision LLM calls
+    _buf = io.BytesIO()
+    image.save(_buf, format="JPEG", quality=92)
+    image_bytes = _buf.getvalue()
+
     barcode_tracking = extract_tracking_number(image)
     label_data = {
         "tracking_number": barcode_tracking,
         "carrier": identify_carrier(barcode_tracking),
     }
 
-    text = get_best_ocr_text(image)
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    ocr_text, ocr_confidence = get_best_ocr_text(image)
+    lines = [line.strip() for line in ocr_text.splitlines() if line.strip()]
 
-    log.debug("Raw OCR text:\n%s", text)
+    log.debug("Raw OCR text:\n%s", ocr_text)
+    log.debug("OCR confidence: %.1f", ocr_confidence)
     for line_index, line in enumerate(lines):
         log.debug("OCR line %s: %r", line_index, line)
 
@@ -53,7 +61,7 @@ def run(image_path, skip_llm=False):
         if not keep_usps_barcode_tracking and (
             not label_data["tracking_number"]
             or identify_carrier(label_data["tracking_number"]) == "Unknown"
-            or "TRACKING" in text.upper()
+            or "TRACKING" in ocr_text.upper()
         ):
             label_data["tracking_number"] = ocr_tracking_candidate
             label_data["carrier"] = identify_carrier(ocr_tracking_candidate)
@@ -73,42 +81,18 @@ def run(image_path, skip_llm=False):
     label_data = normalize_extracted_fields(label_data)
     label_data["carrier"] = identify_carrier_with_context(
         label_data["tracking_number"],
-        text,
+        ocr_text,
     )
     label_data = score_label_data(label_data)
 
-    if skip_llm:
-        llm_result = {
-            "recipient_name": label_data.get("recipient_name", ""),
-            "street_address": label_data.get("street_address", ""),
-            "city": label_data.get("city", ""),
-            "state": label_data.get("state", ""),
-            "zip_code": label_data.get("zip_code", ""),
-            "tracking_number": label_data.get("tracking_number", ""),
-            "carrier": label_data.get("carrier", ""),
-            "llm_enabled": False,
-            "llm_provider": "openai",
-            "llm_notes": "LLM skipped for camera scan.",
-        }
-    else:
-        try:
-            llm_result = extract_fields_with_llm(text, label_data)
-        except Exception:
-            log.exception("OpenAI extraction failed; using the rule-based result")
-            llm_result = {
-                "recipient_name": label_data.get("recipient_name", ""),
-                "street_address": label_data.get("street_address", ""),
-                "city": label_data.get("city", ""),
-                "state": label_data.get("state", ""),
-                "zip_code": label_data.get("zip_code", ""),
-                "tracking_number": label_data.get("tracking_number", ""),
-                "carrier": label_data.get("carrier", ""),
-                "llm_enabled": False,
-                "llm_provider": "openai",
-                "llm_notes": "OpenAI extraction failed; using the rule-based result.",
-            }
-
-    label_data["llm_result"] = llm_result
+    # Determine whether vision LLM should be used instead of text LLM
+    use_vision = (
+        not skip_llm
+        and (
+            ocr_confidence < config.OCR_CONFIDENCE_VISION_THRESHOLD
+            or len(ocr_text.strip()) < config.OCR_TEXT_LENGTH_VISION_THRESHOLD
+        )
+    )
 
     selected_fields = (
         "recipient_name",
@@ -119,6 +103,62 @@ def run(image_path, skip_llm=False):
         "tracking_number",
         "carrier",
     )
+
+    llm_mode = "none"
+
+    def _skip_stub(notes):
+        return {
+            "recipient_name": label_data.get("recipient_name", ""),
+            "street_address": label_data.get("street_address", ""),
+            "city": label_data.get("city", ""),
+            "state": label_data.get("state", ""),
+            "zip_code": label_data.get("zip_code", ""),
+            "tracking_number": label_data.get("tracking_number", ""),
+            "carrier": label_data.get("carrier", ""),
+            "llm_enabled": False,
+            "llm_provider": "none",
+            "llm_notes": notes,
+        }
+
+    if skip_llm:
+        llm_result = _skip_stub("LLM skipped for camera scan.")
+    elif use_vision:
+        try:
+            llm_result = extract_fields_with_llm(ocr_text, label_data, image=image_bytes)
+            llm_mode = "vision"
+        except Exception:
+            log.exception("Vision LLM extraction failed; using rule-based result")
+            llm_result = _skip_stub("Vision LLM extraction failed; using rule-based result.")
+    else:
+        try:
+            llm_result = extract_fields_with_llm(ocr_text, label_data)
+            llm_mode = "text"
+        except Exception:
+            log.exception("LLM extraction failed; using rule-based result")
+            llm_result = _skip_stub("LLM extraction failed; using rule-based result.")
+
+        # Secondary trigger: if text LLM ran but street is still empty/rejected,
+        # try vision LLM to recover fields that OCR garbled
+        if llm_mode == "text" and llm_result.get("llm_enabled"):
+            rule_street_empty = (
+                not label_data.get("street_address")
+                or label_data.get("_street_rejected")
+            )
+            llm_street_empty = not llm_result.get("street_address", "")
+            if rule_street_empty and llm_street_empty:
+                try:
+                    vision_result = extract_fields_with_llm(
+                        ocr_text, label_data, image=image_bytes
+                    )
+                    for f in selected_fields:
+                        if not llm_result.get(f) and vision_result.get(f):
+                            llm_result[f] = vision_result[f]
+                    llm_mode = "vision_fallback"
+                except Exception:
+                    log.exception("Vision fallback LLM failed")
+
+    label_data["llm_result"] = llm_result
+
     llm_available = isinstance(llm_result, dict) and bool(
         llm_result.get("llm_enabled")
     )
@@ -159,7 +199,9 @@ def run(image_path, skip_llm=False):
 
     label_data["comparison"] = comparison
 
-    label_data["_ocr_text"] = text
+    label_data["_ocr_text"] = ocr_text
+    label_data["_ocr_confidence"] = ocr_confidence
+    label_data["_llm_mode"] = llm_mode
     label_data["_tracking_source"] = tracking_source
     label_data["_processing_ms"] = round((time.monotonic() - _start) * 1000)
 
@@ -173,6 +215,7 @@ def build_extraction_result(internal, label_id):
     selected_sources = internal.get("selected_result", {}).get("source", {})
     llm_result = internal.get("llm_result", {})
     llm_called = bool(isinstance(llm_result, dict) and llm_result.get("llm_enabled"))
+    llm_mode = internal.get("_llm_mode", "none")
     processing_ms = internal.get("_processing_ms", 0)
 
     conflicts = []
@@ -219,4 +262,5 @@ def build_extraction_result(internal, label_id):
         llm_called=llm_called,
         conflicts=conflicts,
         processing_ms=processing_ms,
+        llm_mode=llm_mode,
     )

@@ -272,6 +272,7 @@
 
     <canvas id="camera-canvas" hidden></canvas>
 
+    <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js"></script>
     <script>
     (function () {
         var video            = document.getElementById('camera-preview');
@@ -286,9 +287,12 @@
         var placeholder      = document.getElementById('results-placeholder');
         var errEl            = document.getElementById('results-error');
         var outputEl         = document.getElementById('results-output');
-        var stream           = null;
-        var cameraActive     = false;
-        var detector         = null;
+        var stream              = null;
+        var cameraActive        = false;
+        var detector            = null;
+        var scannerMode         = null;   // "native" | "quagga" | null
+        var quaggaDetectTimeout = null;
+        var _quaggaCanvas       = document.createElement('canvas');
 
         /* ── Results helpers ── */
         function showResults(data) {
@@ -318,14 +322,23 @@
                 });
         }
 
-        /* ── Barcode detection (native BarcodeDetector, client-side only) ── */
+        /* ── Barcode detection ── */
         function startBarcodeScan() {
-            if (!('BarcodeDetector' in window)) return;
+            if ('BarcodeDetector' in window) {
+                startNativeScanner();
+            } else {
+                startQuaggaScanner();
+            }
+        }
+
+        /* Native path (Chrome / Edge) */
+        function startNativeScanner() {
             if (!detector) {
                 detector = new BarcodeDetector({
                     formats: ['code_128', 'qr_code', 'pdf417', 'code_39', 'code_93']
                 });
             }
+            scannerMode = 'native';
             barcodeStatusEl.textContent = 'Searching for barcode...';
             barcodeStatusEl.style.color = '';
             barcodeStatusEl.hidden = false;
@@ -351,7 +364,60 @@
                 });
         }
 
+        /* Quagga2 path (Safari and browsers without BarcodeDetector) */
+        function startQuaggaScanner() {
+            if (typeof Quagga === 'undefined') {
+                barcodeStatusEl.textContent = 'Barcode detection unavailable';
+                barcodeStatusEl.hidden = false;
+                return;
+            }
+            scannerMode = 'quagga';
+            barcodeStatusEl.textContent = 'Searching for barcode...';
+            barcodeStatusEl.style.color = '';
+            barcodeStatusEl.hidden = false;
+            quaggaScanLoop();
+        }
+
+        function quaggaScanLoop() {
+            if (scannerMode !== 'quagga') return;
+            if (!video.videoWidth) {
+                requestAnimationFrame(quaggaScanLoop);
+                return;
+            }
+            _quaggaCanvas.width  = video.videoWidth;
+            _quaggaCanvas.height = video.videoHeight;
+            _quaggaCanvas.getContext('2d').drawImage(video, 0, 0);
+            Quagga.decodeSingle({
+                src: _quaggaCanvas.toDataURL('image/jpeg', 0.8),
+                numOfWorkers: 0,
+                inputStream: { size: 800 },
+                decoder: {
+                    readers: [
+                        'code_128_reader', 'upc_reader', 'upc_e_reader',
+                        'code_39_reader',  'i2of5_reader'
+                    ]
+                },
+                locate: true
+            }, function (result) {
+                if (scannerMode !== 'quagga') return;
+                if (result && result.codeResult && result.codeResult.code) {
+                    barcodeStatusEl.textContent = 'Barcode detected: ' + result.codeResult.code;
+                    barcodeStatusEl.style.color = 'green';
+                    clearTimeout(quaggaDetectTimeout);
+                    quaggaDetectTimeout = setTimeout(function () {
+                        if (scannerMode === 'quagga') {
+                            barcodeStatusEl.textContent = 'Searching for barcode...';
+                            barcodeStatusEl.style.color = '';
+                        }
+                    }, 1500);
+                }
+                requestAnimationFrame(quaggaScanLoop);
+            });
+        }
+
         function stopBarcodeScan() {
+            clearTimeout(quaggaDetectTimeout);
+            scannerMode = null;
             cameraActive = false;
             barcodeStatusEl.textContent = '';
             barcodeStatusEl.hidden = true;
@@ -480,7 +546,7 @@
             toggleCameraBtn.textContent = 'Start Camera';
         }
 
-        if (!('BarcodeDetector' in window)) {
+        if (!('BarcodeDetector' in window) && typeof Quagga === 'undefined') {
             barcodeStatusEl.textContent = 'Live barcode detection not supported in this browser';
             barcodeStatusEl.hidden = false;
         }

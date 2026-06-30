@@ -1,4 +1,5 @@
 import pytesseract
+from pytesseract import Output
 import re
 
 from logger import log
@@ -127,12 +128,17 @@ def score_ocr_text(text):
 
 
 def get_best_ocr_text(image):
+    """Return (best_text, ocr_confidence) for the best rotation of image.
+
+    ocr_confidence is Tesseract's mean word-level confidence (0–100).
+    """
     global _last_ocr_diagnostics
 
     rotations = [0, 90, 180, 270]
 
     best_text = ""
     best_score = -1
+    best_degrees = 0
     rotation_texts = {}
 
     for degrees in rotations:
@@ -148,10 +154,19 @@ def get_best_ocr_text(image):
         if score > best_score:
             best_score = score
             best_text = text
+            best_degrees = degrees
+
+    # Compute Tesseract word-level confidence for the winning rotation only
+    best_rotated = image.rotate(best_degrees, expand=True)
+    data = pytesseract.image_to_data(best_rotated, output_type=Output.DICT)
+    conf_values = [c for c in data["conf"] if c != -1]
+    ocr_confidence = sum(conf_values) / len(conf_values) if conf_values else 0.0
+
+    log.debug("OCR best rotation %s confidence: %.1f", best_degrees, ocr_confidence)
 
     _last_ocr_diagnostics = {
         "selected_text": best_text,
         "rotations": rotation_texts,
     }
 
-    return best_text
+    return best_text, ocr_confidence

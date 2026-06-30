@@ -37,3 +37,7 @@ CAMERA_MIN_AREA_RATIO = 0.10
 CAMERA_STABLE_SECONDS = 2.0
 CAMERA_HISTORY_FRAMES = 10
 CAMERA_HISTORY_THRESHOLD = 3
+
+# Vision LLM trigger thresholds
+OCR_CONFIDENCE_VISION_THRESHOLD = 60   # Tesseract mean confidence (0–100); below → use vision
+OCR_TEXT_LENGTH_VISION_THRESHOLD = 50  # chars; shorter OCR output likely needs vision

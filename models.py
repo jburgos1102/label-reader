@@ -32,6 +32,7 @@ class ExtractionResult:
     llm_called: bool = False
     conflicts: list[str] = field(default_factory=list)
     processing_ms: int = 0
+    llm_mode: str = "none"
 
     def to_dict(self) -> dict:
         return {
@@ -56,5 +57,6 @@ class ExtractionResult:
                 "llm_called": self.llm_called,
                 "conflicts": self.conflicts,
                 "processing_ms": self.processing_ms,
+                "llm_mode": self.llm_mode,
             },
         }
