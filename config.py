@@ -27,7 +27,7 @@ CONFIDENCE_ZIP_OCR = 0.78     # 5-digit format match only; single misread digit 
 
 # LLM cross-validation against OCR text
 CONFIDENCE_LLM_OCR_MATCH = 0.85
-CONFIDENCE_LLM_OCR_MISMATCH = 0.30
+CONFIDENCE_LLM_OCR_MISMATCH = 0.75   # value absent from OCR but plausible (vision reads image)
 
 # SQLite storage
 STORAGE_DB_PATH = "label_storage.db"
@@ -41,3 +41,5 @@ CAMERA_HISTORY_THRESHOLD = 3
 # Vision LLM trigger thresholds
 OCR_CONFIDENCE_VISION_THRESHOLD = 60   # Tesseract mean confidence (0–100); below → use vision
 OCR_TEXT_LENGTH_VISION_THRESHOLD = 50  # chars; shorter OCR output likely needs vision
+VISION_TRIGGER_BLANK_FIELDS = 3        # blank/zero-confidence address fields → use vision
+CONFIDENCE_TRACKING_CHECKSUM_FAIL = 0.30  # tracking number failed checksum validation

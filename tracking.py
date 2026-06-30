@@ -108,6 +108,59 @@ def identify_carrier_with_context(tracking_number, ocr_text):
     return carrier
 
 
+# --- CHECKSUM VALIDATION ---
+
+
+def _validate_usps_checksum(tracking_number):
+    """Mod-10 checksum for USPS all-digit numbers that start with 9, length 20-22."""
+    if not tracking_number or not tracking_number.isdigit():
+        return None
+    if not (20 <= len(tracking_number) <= 22):
+        return None
+    if not tracking_number.startswith("9"):
+        return None
+
+    body = tracking_number[:-1]
+    check_digit = int(tracking_number[-1])
+
+    # Multiply alternating digits by 3 and 1 starting from the right of the body.
+    total = sum(
+        int(d) * (3 if i % 2 == 0 else 1)
+        for i, d in enumerate(reversed(body))
+    )
+    return (10 - (total % 10)) % 10 == check_digit
+
+
+def _validate_ups_checksum(tracking_number):
+    """Check-digit validation for UPS 1Z tracking numbers (1Z + 16 alphanumeric chars)."""
+    if not re.fullmatch(r"1Z[A-Z0-9]{16}", tracking_number):
+        return None
+
+    check_char = tracking_number[-1]
+    if not check_char.isdigit():
+        return False
+
+    body = tracking_number[2:-1]  # 16 chars between 1Z and check digit
+    total = 0
+    for i, char in enumerate(body):
+        value = int(char) if char.isdigit() else ord(char) - 63  # A=2 … Z=27
+        multiplier = 1 if (i + 1) % 2 == 1 else 2               # odd pos ×1, even ×2
+        total += value * multiplier
+
+    return (10 - (total % 10)) % 10 == int(check_char)
+
+
+def validate_tracking_checksum(tracking_number, carrier):
+    """Return True (valid), False (invalid), or None (format not checksum-validated)."""
+    if not tracking_number:
+        return None
+    if carrier == "USPS":
+        return _validate_usps_checksum(tracking_number)
+    if carrier == "UPS":
+        return _validate_ups_checksum(tracking_number)
+    return None
+
+
 # --- TRACKING HELPER FUNCTIONS ---
 
 

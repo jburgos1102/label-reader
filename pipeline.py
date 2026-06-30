@@ -10,11 +10,12 @@ from llm_extractor import extract_fields_with_llm
 from logger import log
 from models import EXTRACTION_FIELDS, ExtractionResult, FieldValue
 from ocr import get_best_ocr_text
-from scoring import normalize_comparison_value, score_label_data
+from scoring import normalize_comparison_value, score_label_data, score_llm_result
 from tracking import (
     extract_tracking_from_ocr_lines,
     identify_carrier,
     identify_carrier_with_context,
+    validate_tracking_checksum,
 )
 
 
@@ -85,13 +86,38 @@ def run(image_path, skip_llm=False):
     )
     label_data = score_label_data(label_data)
 
-    # Determine whether vision LLM should be used instead of text LLM
+    # Checksum validation — lower confidence and warn if format is known but check fails
+    _checksum_valid = validate_tracking_checksum(
+        label_data.get("tracking_number", ""),
+        label_data.get("carrier", ""),
+    )
+    if _checksum_valid is False:
+        label_data["confidence"]["tracking_number"] = config.CONFIDENCE_TRACKING_CHECKSUM_FAIL
+        label_data.setdefault("warnings", []).append("tracking_checksum_failed")
+    log.debug(
+        "Tracking checksum: %s (carrier=%s valid=%s)",
+        label_data.get("tracking_number", ""),
+        label_data.get("carrier", ""),
+        _checksum_valid,
+    )
+
+    # Determine whether vision LLM should be used instead of (or despite) skip_llm
+    _address_fields = ("city", "state", "street_address", "zip_code")
+    _scored_conf = label_data.get("confidence", {})
+    blank_address_fields = sum(
+        1 for f in _address_fields
+        if not label_data.get(f) or _scored_conf.get(f, 0.0) == 0.0
+    )
+    street_rejected = label_data.get("_street_rejected", False)
     use_vision = (
-        not skip_llm
-        and (
-            ocr_confidence < config.OCR_CONFIDENCE_VISION_THRESHOLD
-            or len(ocr_text.strip()) < config.OCR_TEXT_LENGTH_VISION_THRESHOLD
-        )
+        ocr_confidence < config.OCR_CONFIDENCE_VISION_THRESHOLD
+        or len(ocr_text.strip()) < config.OCR_TEXT_LENGTH_VISION_THRESHOLD
+        or blank_address_fields >= config.VISION_TRIGGER_BLANK_FIELDS
+        or street_rejected
+    )
+    log.debug(
+        "Vision trigger: ocr_conf=%.1f text_len=%d blank_addr=%d street_rejected=%s use_vision=%s",
+        ocr_confidence, len(ocr_text.strip()), blank_address_fields, street_rejected, use_vision,
     )
 
     selected_fields = (
@@ -120,15 +146,15 @@ def run(image_path, skip_llm=False):
             "llm_notes": notes,
         }
 
-    if skip_llm:
-        llm_result = _skip_stub("LLM skipped for camera scan.")
-    elif use_vision:
+    if use_vision:
         try:
             llm_result = extract_fields_with_llm(ocr_text, label_data, image=image_bytes)
             llm_mode = "vision"
         except Exception:
             log.exception("Vision LLM extraction failed; using rule-based result")
             llm_result = _skip_stub("Vision LLM extraction failed; using rule-based result.")
+    elif skip_llm:
+        llm_result = _skip_stub("LLM skipped for camera scan.")
     else:
         try:
             llm_result = extract_fields_with_llm(ocr_text, label_data)
@@ -218,13 +244,26 @@ def build_extraction_result(internal, label_id):
     llm_mode = internal.get("_llm_mode", "none")
     processing_ms = internal.get("_processing_ms", 0)
 
+    # Only flag a conflict when both rule and LLM produced real, differing values.
+    # Empty rule or "Unknown" carrier = rule failed; LLM filling it is a fallback, not a conflict.
     conflicts = []
     if llm_called:
         for field, cmp in internal.get("comparison", {}).items():
-            if field in EXTRACTION_FIELDS and not cmp.get("agreement") and cmp.get("openai"):
+            rule_val = cmp.get("rule_based", "")
+            if (
+                field in EXTRACTION_FIELDS
+                and not cmp.get("agreement")
+                and cmp.get("openai")
+                and rule_val
+                and rule_val != "Unknown"
+            ):
                 conflicts.append(field)
 
     tracking_confidence = confidence.get("tracking_number", 0.0)
+
+    # BUG 1 fix: cross-validate LLM values against OCR text so LLM-sourced fields
+    # get 0.85 (found in OCR) or 0.75 (plausible from image) instead of rule-based 0.0.
+    llm_scores = score_llm_result(llm_result, internal.get("_ocr_text", ""))
 
     def _fv(name):
         rule_value = internal.get(name, "")
@@ -246,6 +285,9 @@ def build_extraction_result(internal, label_id):
                 source = "agreement"
             elif raw == "llm":
                 source = "llm"
+                llm_conf = llm_scores.get(name)
+                if llm_conf is not None:
+                    conf = llm_conf
             else:
                 source = "rule"
         return FieldValue(value=value, confidence=conf, source=source)
