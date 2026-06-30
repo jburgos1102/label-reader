@@ -2,6 +2,7 @@ import pytesseract
 from pytesseract import Output
 import re
 
+import config
 from logger import log
 
 
@@ -128,45 +129,55 @@ def score_ocr_text(text):
 
 
 def get_best_ocr_text(image):
-    """Return (best_text, ocr_confidence) for the best rotation of image.
+    """Return (best_text, ocr_confidence, rotations_tried) for image.
 
-    ocr_confidence is Tesseract's mean word-level confidence (0–100).
+    Runs rotations in order 0→90→180→270 and exits as soon as Tesseract's
+    mean word-level confidence reaches OCR_CONFIDENCE_EARLY_EXIT (75).  If no
+    rotation clears the threshold, the rotation with the best score_ocr_text
+    score is returned (existing fallback behaviour).
     """
     global _last_ocr_diagnostics
 
-    rotations = [0, 90, 180, 270]
-
     best_text = ""
     best_score = -1
-    best_degrees = 0
+    best_confidence = 0.0
     rotation_texts = {}
+    rotations_tried = 0
 
-    for degrees in rotations:
+    for degrees in [0, 90, 180, 270]:
         rotated_image = image.rotate(degrees, expand=True)
         text = pytesseract.image_to_string(rotated_image)
         rotation_texts[degrees] = text
+        rotations_tried += 1
 
         score = score_ocr_text(text)
-
         log.debug("OCR rotation %s score: %s", degrees, score)
         log.debug("OCR rotation %s preview: %s", degrees, text[:200])
+
+        data = pytesseract.image_to_data(rotated_image, output_type=Output.DICT)
+        conf_values = [c for c in data["conf"] if c != -1]
+        confidence = sum(conf_values) / len(conf_values) if conf_values else 0.0
+        log.debug("OCR rotation %s confidence: %.1f", degrees, confidence)
 
         if score > best_score:
             best_score = score
             best_text = text
-            best_degrees = degrees
-
-    # Compute Tesseract word-level confidence for the winning rotation only
-    best_rotated = image.rotate(best_degrees, expand=True)
-    data = pytesseract.image_to_data(best_rotated, output_type=Output.DICT)
-    conf_values = [c for c in data["conf"] if c != -1]
-    ocr_confidence = sum(conf_values) / len(conf_values) if conf_values else 0.0
-
-    log.debug("OCR best rotation %s confidence: %.1f", best_degrees, ocr_confidence)
+            best_confidence = confidence
+            # Early exit: this rotation is the new best by label structure AND
+            # Tesseract confidence is high.  Check score >= 12 so we don't exit
+            # on a wrong-orientation read where Tesseract is still confident but
+            # incidental regex matches (e.g. a garbled STATE-ZIP pattern) gave it
+            # a low score that doesn't reflect a real label read.
+            if confidence >= config.OCR_CONFIDENCE_EARLY_EXIT and best_score >= 12:
+                log.debug(
+                    "OCR early exit at rotation %s (confidence=%.1f score=%d)",
+                    degrees, confidence, best_score,
+                )
+                break
 
     _last_ocr_diagnostics = {
         "selected_text": best_text,
         "rotations": rotation_texts,
     }
 
-    return best_text, ocr_confidence
+    return best_text, best_confidence, rotations_tried

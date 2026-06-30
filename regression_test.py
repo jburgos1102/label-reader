@@ -2,9 +2,10 @@ import os
 import sys
 
 
-# Regression checks must stay rule-based only and must never call OpenAI.
+# Regression checks must stay rule-based only and must never call OpenAI or Groq.
 os.environ["EVALUATE_LLM"] = ""
 os.environ["OPENAI_API_KEY"] = ""
+os.environ["GROQ_API_KEY"] = ""
 
 from evaluate import (  # noqa: E402
     DATASETS_DIR,
@@ -61,6 +62,14 @@ def calculate_rule_based_metrics():
 
 
 def main():
+    llm_disabled = not os.environ.get("OPENAI_API_KEY", "").strip() and not os.environ.get(
+        "GROQ_API_KEY", ""
+    ).strip()
+    if llm_disabled:
+        print("LLM calls: DISABLED (rule-based only)")
+    else:
+        print("LLM calls: ENABLED (using Groq)")
+
     labels_tested, field_passes, field_totals, metrics = calculate_rule_based_metrics()
     regressions = []
 

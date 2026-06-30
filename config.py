@@ -43,3 +43,6 @@ OCR_CONFIDENCE_VISION_THRESHOLD = 60   # Tesseract mean confidence (0–100); be
 OCR_TEXT_LENGTH_VISION_THRESHOLD = 50  # chars; shorter OCR output likely needs vision
 VISION_TRIGGER_BLANK_FIELDS = 3        # blank/zero-confidence address fields → use vision
 CONFIDENCE_TRACKING_CHECKSUM_FAIL = 0.30  # tracking number failed checksum validation
+
+# OCR early-exit threshold — stop rotation loop once this confidence is reached
+OCR_CONFIDENCE_EARLY_EXIT = 75
