@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -400,7 +401,32 @@ def print_ocr_failure_diagnostics(diagnostics):
 
 
 def main():
-    labels = storage.get_annotated_labels()
+    parser = argparse.ArgumentParser(description="Evaluate extraction accuracy against annotated labels.")
+    parser.add_argument(
+        "--latest-only",
+        action="store_true",
+        help="Among labels sharing the same tracking number, evaluate only the most recent scan.",
+    )
+    args = parser.parse_args()
+
+    labels = storage.get_annotated_labels()  # newest-first (ORDER BY processed_at DESC)
+
+    if args.latest_only:
+        seen: set[str] = set()
+        deduped = []
+        for label in labels:
+            tn = label.get("tracking_number") or ""
+            if tn and tn in seen:
+                continue
+            if tn:
+                seen.add(tn)
+            deduped.append(label)
+        print(
+            f"Deduplication: kept {len(deduped)} of {len(labels)} annotated labels"
+            f" (latest scan per tracking number)"
+        )
+        labels = deduped
+
     n = len(labels)
 
     if n == 0:

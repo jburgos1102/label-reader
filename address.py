@@ -15,6 +15,14 @@ _NAME_STREET_SUFFIXES = re.compile(
     re.IGNORECASE,
 )
 
+_NAME_ORG_WORDS = re.compile(
+    r"\b(?:Associates|Group|Corp|Inc|LLC|LLP|LP|Dept|Department|Processing|"
+    r"Unit|Claims|Services|Solutions|Division|Partners|Foundation|"
+    r"Bureau|Office|Center|Centre|Agency|Systems|Industries|Enterprises|"
+    r"Plan|Pension)\b",
+    re.IGNORECASE,
+)
+
 
 def clean_physical_street_ocr(value):
     """Clean conservative OCR noise from a line that starts like an address."""
@@ -550,6 +558,10 @@ def normalize_extracted_fields(label_data):
             label_data["_name_looks_like_street"] = True
         if re.search(r"\bSENDER\b", recipient_name, re.IGNORECASE):
             label_data["_name_is_sender_artifact"] = True
+        if not re.search(r"\s", recipient_name) and len(recipient_name) > 3:
+            label_data["_name_single_word"] = True
+        if _NAME_ORG_WORDS.search(recipient_name):
+            label_data["_name_looks_like_org"] = True
 
     if city:
         city = city.strip()

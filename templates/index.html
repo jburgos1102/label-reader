@@ -294,11 +294,11 @@
                     <video id="camera-preview" autoplay playsinline></video>
 
                     <p id="barcode-status" class="barcode-status"></p>
-                    <p id="camera-status" class="camera-status">Connecting to camera…</p>
+                    <p id="camera-status" class="camera-status"></p>
 
                     <div class="camera-btn-row">
                         <button type="button" id="capture-btn" disabled>Capture &amp; Scan</button>
-                        <button type="button" id="toggle-camera-btn" class="secondary">Stop Camera</button>
+                        <button type="button" id="toggle-camera-btn" class="secondary">Start Camera</button>
                     </div>
                 </section>
 
@@ -701,13 +701,8 @@
             });
         });
 
-        /* ── Auto-start camera on page load ── */
-        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            startCamera(null);
-        } else {
-            statusEl.textContent = 'No camera detected';
-            toggleCameraBtn.textContent = 'Start Camera';
-        }
+        /* ── Initial state: camera off until user clicks Start Camera ── */
+        video.hidden = true;
 
         if (!('BarcodeDetector' in window) && typeof Quagga === 'undefined') {
             barcodeStatusEl.textContent = 'Live barcode detection not supported in this browser';
