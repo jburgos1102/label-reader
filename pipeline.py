@@ -206,6 +206,17 @@ def run(image_path, skip_llm=False):
         ) == normalize_comparison_value(openai_value)
 
         if not rule_based_value and llm_available and openai_value:
+            # Rule produced nothing; LLM fills the gap.
+            selected_result[field] = openai_value
+            selected_sources[field] = "llm"
+        elif (
+            llm_mode == "vision"
+            and llm_available
+            and openai_value
+            and not values_agree
+        ):
+            # Vision was triggered because rule-based extraction is unreliable;
+            # defer to LLM on any conflict rather than letting rule win.
             selected_result[field] = openai_value
             selected_sources[field] = "llm"
         else:
@@ -278,7 +289,10 @@ def build_extraction_result(internal, label_id):
     def _fv(name):
         rule_value = internal.get(name, "")
         sel_value = internal.get("selected_result", {}).get(name, "")
-        value = rule_value or sel_value
+        raw = selected_sources.get(name, "rule_based")
+        # When the selection loop chose LLM (e.g. vision conflict override),
+        # prefer the selected LLM value; otherwise prefer the rule value.
+        value = (sel_value or rule_value) if raw == "llm" else (rule_value or sel_value)
         conf = confidence.get(name, 0.0)
         if name == "carrier":
             conf = tracking_confidence
@@ -290,7 +304,6 @@ def build_extraction_result(internal, label_id):
         elif name == "tracking_number":
             source = tracking_source
         else:
-            raw = selected_sources.get(name, "rule_based")
             if raw == "agreement":
                 source = "agreement"
             elif raw == "llm":

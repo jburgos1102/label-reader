@@ -33,6 +33,7 @@ class ExtractionResult:
     conflicts: list[str] = field(default_factory=list)
     processing_ms: int = 0
     llm_mode: str = "none"
+    ocr_rotations_tried: int = 4
 
     def to_dict(self) -> dict:
         return {
@@ -58,5 +59,6 @@ class ExtractionResult:
                 "conflicts": self.conflicts,
                 "processing_ms": self.processing_ms,
                 "llm_mode": self.llm_mode,
+                "ocr_rotations_tried": self.ocr_rotations_tried,
             },
         }
