@@ -110,15 +110,21 @@ def run(image_path, skip_llm=False):
         if not label_data.get(f) or _scored_conf.get(f, 0.0) == 0.0
     )
     street_rejected = label_data.get("_street_rejected", False)
+    name_looks_like_street = label_data.get("_name_looks_like_street", False)
+    name_is_sender_artifact = label_data.get("_name_is_sender_artifact", False)
     use_vision = (
         ocr_confidence < config.OCR_CONFIDENCE_VISION_THRESHOLD
         or len(ocr_text.strip()) < config.OCR_TEXT_LENGTH_VISION_THRESHOLD
         or blank_address_fields >= config.VISION_TRIGGER_BLANK_FIELDS
         or street_rejected
+        or name_looks_like_street
+        or name_is_sender_artifact
     )
     log.debug(
-        "Vision trigger: ocr_conf=%.1f text_len=%d blank_addr=%d street_rejected=%s use_vision=%s",
-        ocr_confidence, len(ocr_text.strip()), blank_address_fields, street_rejected, use_vision,
+        "Vision trigger: ocr_conf=%.1f text_len=%d blank_addr=%d street_rejected=%s "
+        "name_street=%s name_sender=%s use_vision=%s",
+        ocr_confidence, len(ocr_text.strip()), blank_address_fields, street_rejected,
+        name_looks_like_street, name_is_sender_artifact, use_vision,
     )
 
     selected_fields = (
