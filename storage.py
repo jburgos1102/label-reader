@@ -185,3 +185,49 @@ def get_label(label_id):
         data[json_field] = json.loads(raw) if raw else None
 
     return data
+
+
+def update_ground_truth(label_id, fields):
+    """Write fields to the ground_truth column for an existing label.
+
+    Returns the updated label dict, or None if label_id does not exist.
+    """
+    with _connect() as conn:
+        row = conn.execute("SELECT id FROM labels WHERE id = ?", (label_id,)).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "UPDATE labels SET ground_truth = ? WHERE id = ?",
+            (json.dumps(fields), label_id),
+        )
+    return get_label(label_id)
+
+
+def list_labels(limit=50):
+    """Return the most recent labels as a list of summary dicts.
+
+    ground_truth is returned as a bool (True if the field has been annotated).
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, processed_at, original_filename, carrier,
+                   tracking_number, recipient_name, ground_truth
+            FROM labels
+            ORDER BY processed_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [
+        {
+            "label_id": row["id"],
+            "processed_at": row["processed_at"],
+            "original_filename": row["original_filename"],
+            "carrier": row["carrier"],
+            "tracking_number": row["tracking_number"],
+            "recipient_name": row["recipient_name"],
+            "ground_truth": row["ground_truth"] is not None,
+        }
+        for row in rows
+    ]

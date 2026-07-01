@@ -124,12 +124,23 @@ def api_scan():
         return jsonify({"error": "Unable to save the image."}), 500
 
     try:
-        result = _run_and_store(image_path, skip_llm=True, original_filename=None)
+        result = _run_and_store(image_path, skip_llm=True, original_filename=uploaded_file.filename)
     except Exception:
         log.exception("Unable to extract label data for /api/scan")
         return jsonify({"error": "Unable to process the image."}), 500
 
     return jsonify(result.to_dict())
+
+
+_CORRECTABLE_FIELDS = {
+    "recipient_name", "street_address", "city", "state",
+    "zip_code", "tracking_number", "carrier",
+}
+
+
+@app.route("/labels", methods=["GET"])
+def list_labels():
+    return jsonify(storage.list_labels())
 
 
 @app.route("/labels/<label_id>", methods=["GET"])
@@ -138,6 +149,18 @@ def get_label(label_id):
     if label is None:
         return jsonify({"error": "Label not found."}), 404
     return jsonify(label)
+
+
+@app.route("/labels/<label_id>/correct", methods=["POST"])
+def correct_label(label_id):
+    if storage.get_label(label_id) is None:
+        return jsonify({"error": "Label not found."}), 404
+
+    body = request.get_json(silent=True) or {}
+    fields = {k: v for k, v in body.items() if k in _CORRECTABLE_FIELDS}
+
+    updated = storage.update_ground_truth(label_id, fields)
+    return jsonify(updated)
 
 
 if __name__ == "__main__":

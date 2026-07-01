@@ -210,12 +210,67 @@
             white-space: pre-wrap;
         }
 
+        /* ── Annotation panel ── */
+        .annotate-panel {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--row-border);
+        }
+
+        .annotate-panel h3 {
+            margin: 0 0 12px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .annotate-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 16px;
+            margin-bottom: 14px;
+        }
+
+        .annotate-field label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .annotate-field input {
+            width: 100%;
+            padding: 7px 10px;
+            border: 1px solid var(--row-border);
+            border-radius: 5px;
+            background: var(--row);
+            color: var(--text);
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .annotate-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .annotate-status {
+            margin: 8px 0 0;
+            font-size: 13px;
+            min-height: 1.4em;
+        }
+
+        .annotate-status.ok  { color: var(--green); }
+        .annotate-status.err { color: var(--danger); }
+
         /* ── Mobile: stack columns ── */
         @media (max-width: 680px) {
             .scanner-layout { grid-template-columns: 1fr; }
             .upload-row { grid-template-columns: 1fr; }
             button { width: 100%; }
             .camera-btn-row { flex-direction: column; }
+            .annotate-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -265,6 +320,42 @@
                 </p>
                 <p id="results-error" class="error-msg" hidden></p>
                 <pre id="results-output" hidden></pre>
+
+                <div id="annotate-panel" class="annotate-panel" hidden>
+                    <h3>Annotate</h3>
+                    <div class="annotate-grid">
+                        <div class="annotate-field">
+                            <label for="ann-recipient-name">Recipient Name</label>
+                            <input type="text" id="ann-recipient-name" name="recipient_name">
+                        </div>
+                        <div class="annotate-field">
+                            <label for="ann-street-address">Street Address</label>
+                            <input type="text" id="ann-street-address" name="street_address">
+                        </div>
+                        <div class="annotate-field">
+                            <label for="ann-city">City</label>
+                            <input type="text" id="ann-city" name="city">
+                        </div>
+                        <div class="annotate-field">
+                            <label for="ann-state">State</label>
+                            <input type="text" id="ann-state" name="state">
+                        </div>
+                        <div class="annotate-field">
+                            <label for="ann-zip-code">ZIP Code</label>
+                            <input type="text" id="ann-zip-code" name="zip_code">
+                        </div>
+                        <div class="annotate-field">
+                            <label for="ann-tracking-number">Tracking Number</label>
+                            <input type="text" id="ann-tracking-number" name="tracking_number">
+                        </div>
+                        <div class="annotate-field">
+                            <label for="ann-carrier">Carrier</label>
+                            <input type="text" id="ann-carrier" name="carrier">
+                        </div>
+                    </div>
+                    <button type="button" id="annotate-btn">Save Annotation</button>
+                    <p id="annotate-status" class="annotate-status"></p>
+                </div>
             </section>
 
         </div>
@@ -293,6 +384,21 @@
         var scannerMode         = null;   // "native" | "quagga" | null
         var quaggaDetectTimeout = null;
         var _quaggaCanvas       = document.createElement('canvas');
+        var currentLabelId      = null;
+
+        var annotatePanel  = document.getElementById('annotate-panel');
+        var annotateBtn    = document.getElementById('annotate-btn');
+        var annotateStatus = document.getElementById('annotate-status');
+
+        var _annotateInputs = {
+            recipient_name:  document.getElementById('ann-recipient-name'),
+            street_address:  document.getElementById('ann-street-address'),
+            city:            document.getElementById('ann-city'),
+            state:           document.getElementById('ann-state'),
+            zip_code:        document.getElementById('ann-zip-code'),
+            tracking_number: document.getElementById('ann-tracking-number'),
+            carrier:         document.getElementById('ann-carrier'),
+        };
 
         /* ── Results helpers ── */
         function showResults(data) {
@@ -300,6 +406,20 @@
             errEl.hidden = true;
             outputEl.textContent = JSON.stringify(data, null, 4);
             outputEl.hidden = false;
+
+            currentLabelId = data.label_id || null;
+            if (currentLabelId && data.extracted) {
+                var ex = data.extracted;
+                Object.keys(_annotateInputs).forEach(function (field) {
+                    _annotateInputs[field].value =
+                        (ex[field] && ex[field].value != null) ? ex[field].value : '';
+                });
+                annotateStatus.textContent = '';
+                annotateStatus.className = 'annotate-status';
+                annotatePanel.hidden = false;
+            } else {
+                annotatePanel.hidden = true;
+            }
         }
 
         function showError(msg) {
@@ -307,6 +427,8 @@
             outputEl.hidden = true;
             errEl.textContent = msg;
             errEl.hidden = false;
+            currentLabelId = null;
+            annotatePanel.hidden = true;
         }
 
         /* ── POST image to /api/scan ── */
@@ -536,6 +658,47 @@
                     uploadBtn.disabled = false;
                     uploadBtn.textContent = 'Upload';
                 });
+        });
+
+        /* ── Annotation submit ── */
+        annotateBtn.addEventListener('click', function () {
+            if (!currentLabelId) return;
+
+            var payload = {};
+            Object.keys(_annotateInputs).forEach(function (field) {
+                payload[field] = _annotateInputs[field].value;
+            });
+
+            annotateBtn.disabled = true;
+            annotateStatus.textContent = 'Saving…';
+            annotateStatus.className = 'annotate-status';
+
+            fetch('/labels/' + currentLabelId + '/correct', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            .then(function (resp) {
+                return resp.json().then(function (body) {
+                    if (!resp.ok) throw new Error(body.error || 'Server error ' + resp.status);
+                    return body;
+                });
+            })
+            .then(function (saved) {
+                var gt = saved.ground_truth || {};
+                Object.keys(_annotateInputs).forEach(function (field) {
+                    if (gt[field] != null) _annotateInputs[field].value = gt[field];
+                });
+                annotateStatus.textContent = 'Saved';
+                annotateStatus.className = 'annotate-status ok';
+            })
+            .catch(function (err) {
+                annotateStatus.textContent = 'Error: ' + err.message;
+                annotateStatus.className = 'annotate-status err';
+            })
+            .then(function () {
+                annotateBtn.disabled = false;
+            });
         });
 
         /* ── Auto-start camera on page load ── */
