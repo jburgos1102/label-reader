@@ -187,6 +187,25 @@ def get_label(label_id):
     return data
 
 
+def get_annotated_labels():
+    """Return all labels that have a ground_truth annotation, newest first.
+
+    ground_truth and corrections are parsed from JSON into Python objects.
+    """
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM labels WHERE ground_truth IS NOT NULL ORDER BY processed_at DESC"
+        ).fetchall()
+    result = []
+    for row in rows:
+        data = dict(row)
+        for json_field in ("ground_truth", "corrections"):
+            raw = data.get(json_field)
+            data[json_field] = json.loads(raw) if raw else None
+        result.append(data)
+    return result
+
+
 def update_ground_truth(label_id, fields):
     """Write fields to the ground_truth column for an existing label.
 

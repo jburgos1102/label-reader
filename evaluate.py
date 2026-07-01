@@ -3,6 +3,8 @@ import os
 import re
 from pathlib import Path
 
+import storage
+
 
 EVALUATE_LLM = os.getenv("EVALUATE_LLM", "").strip().lower() == "true"
 OCR_DIAGNOSTICS = os.getenv("OCR_DIAGNOSTICS", "").strip().lower() == "true"
@@ -398,313 +400,181 @@ def print_ocr_failure_diagnostics(diagnostics):
 
 
 def main():
-    expected_files = sorted(DATASETS_DIR.glob("*/expected/*.json"))
-    gold_set_configured = GOLD_SET_PATH.exists()
-    gold_set = load_gold_set()
+    labels = storage.get_annotated_labels()
+    n = len(labels)
 
-    if not expected_files:
-        print("No expected JSON files found.")
+    if n == 0:
+        print("No annotated labels found in the database.")
         return
 
-    field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
-    field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
-    selected_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
-    selected_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
-    llm_field_totals = {field: 0 for field in FIELDS_TO_COMPARE}
-    llm_field_passes = {field: 0 for field in FIELDS_TO_COMPARE}
-    gold_rule_totals = {field: 0 for field in FIELDS_TO_COMPARE}
-    gold_rule_correct = {field: 0 for field in FIELDS_TO_COMPARE}
-    gold_selected_totals = {field: 0 for field in FIELDS_TO_COMPARE}
-    gold_selected_correct = {field: 0 for field in FIELDS_TO_COMPARE}
-    gold_openai_totals = {field: 0 for field in FIELDS_TO_COMPARE}
-    gold_openai_correct = {field: 0 for field in FIELDS_TO_COMPARE}
-    hybrid_counts = {
-        field: {
-            "rule_only": 0,
-            "openai_only": 0,
-            "both_passed": 0,
-            "both_failed": 0,
-        }
-        for field in FIELDS_TO_COMPARE
-    }
-    labels_tested = 0
-    selected_labels_scored = 0
-    selected_labels_skipped = 0
-    llm_labels_scored = 0
-    llm_labels_skipped = 0
+    if n < 5:
+        print(
+            f"Warning: only {n} annotated label{'s' if n != 1 else ''}"
+            " — results may not be representative"
+        )
+
+    print(f"\nAnnotated labels evaluated: {n}")
+
+    field_correct = {f: 0 for f in FIELDS_TO_COMPARE}
+    field_total = {f: 0 for f in FIELDS_TO_COMPARE}
+    field_conf_sum = {f: 0.0 for f in FIELDS_TO_COMPARE}
+    field_conf_count = {f: 0 for f in FIELDS_TO_COMPARE}
+
+    source_correct: dict[str, int] = {}
+    source_total: dict[str, int] = {}
+
+    # Buckets ordered high-to-low; first match wins.
+    conf_buckets = [
+        (0.90, "0.90 – 1.00"),
+        (0.70, "0.70 – 0.89"),
+        (0.50, "0.50 – 0.69"),
+        (0.00, "0.00 – 0.49"),
+    ]
+    bucket_correct = {lbl: 0 for _, lbl in conf_buckets}
+    bucket_total = {lbl: 0 for _, lbl in conf_buckets}
+
     failures = []
-    selected_failures = []
-    llm_failures = []
-    ocr_failure_diagnostics = []
 
-    for expected_path in expected_files:
-        image_path = find_image_for_expected(expected_path)
+    for label in labels:
+        gt = label["ground_truth"]  # already a dict
+        label_id = label["id"]
 
-        if image_path is None:
-            failures.append(
-                {
-                    "label": str(expected_path),
-                    "field": "image",
-                    "expected": "matching image file",
-                    "actual": "missing",
-                }
+        for field in FIELDS_TO_COMPARE:
+            if field not in gt:
+                continue
+
+            extracted_val = label.get(field)
+            gt_val = gt[field]
+            confidence = label.get(f"{field}_confidence")
+            source = label.get(f"{field}_source") or ""
+
+            is_correct = (
+                (extracted_val or "").strip().lower()
+                == (gt_val or "").strip().lower()
             )
-            continue
 
-        expected_data = load_expected_json(expected_path)
-        actual_data = extract_label_data(str(image_path))
-        labels_tested += 1
-        rule_field_results = {}
-        is_gold_label = normalize_image_path(image_path) in gold_set
+            field_total[field] += 1
+            if is_correct:
+                field_correct[field] += 1
 
-        print(f"\nTesting: {image_path}")
+            if confidence is not None:
+                field_conf_sum[field] += confidence
+                field_conf_count[field] += 1
 
-        for field in FIELDS_TO_COMPARE:
-            if not has_ground_truth(expected_data, field):
-                continue
+            src = source or "unknown"
+            source_total[src] = source_total.get(src, 0) + 1
+            if is_correct:
+                source_correct[src] = source_correct.get(src, 0) + 1
 
-            field_totals[field] += 1
-            passed = compare_field(actual_data, expected_data, field)
-            rule_field_results[field] = passed
+            if confidence is not None:
+                for lo, lbl in conf_buckets:
+                    if confidence >= lo:
+                        bucket_total[lbl] += 1
+                        if is_correct:
+                            bucket_correct[lbl] += 1
+                        break
 
-            if is_gold_label:
-                gold_rule_totals[field] += 1
-                if passed:
-                    gold_rule_correct[field] += 1
-
-            if passed:
-                field_passes[field] += 1
-            else:
-                failure = {
-                    "label": str(image_path),
-                    "field": field,
-                    "expected": expected_data.get(field, ""),
-                    "actual": actual_data.get(field, ""),
-                }
-                failures.append(failure)
-
-                if OCR_DIAGNOSTICS and field in OCR_DIAGNOSTIC_FIELDS:
-                    ocr_failure_diagnostics.append(
-                        build_ocr_failure_diagnostic(
-                            str(image_path),
-                            field,
-                            expected_data.get(field, ""),
-                        )
-                    )
-
-                print(
-                    f"  FAIL {field}: "
-                    f"expected={expected_data.get(field, '')!r} "
-                    f"actual={actual_data.get(field, '')!r}"
-                )
-
-        extraction_result = build_extraction_result(actual_data, "eval")
-        extracted = extraction_result.to_dict()["extracted"]
-        selected_labels_scored += 1
-
-        for field in FIELDS_TO_COMPARE:
-            if not has_ground_truth(expected_data, field):
-                continue
-
-            selected_field_totals[field] += 1
-            field_value = extracted.get(field, {}).get("value", "")
-            passed = compare_field({field: field_value}, expected_data, field)
-
-            if is_gold_label:
-                gold_selected_totals[field] += 1
-                if passed:
-                    gold_selected_correct[field] += 1
-
-            if passed:
-                selected_field_passes[field] += 1
-            else:
-                selected_failures.append(
+            if not is_correct:
+                failures.append(
                     {
-                        "label": str(image_path),
+                        "label_id": label_id,
                         "field": field,
-                        "expected": expected_data.get(field, ""),
-                        "actual": field_value,
+                        "extracted": extracted_val,
+                        "ground_truth": gt_val,
+                        "confidence": confidence,
+                        "source": source,
                     }
                 )
 
-        if not EVALUATE_LLM:
-            continue
+    # ── Per-field accuracy table ──────────────────────────────────────────────
+    COL = (20, 9, 7, 10, 15)
+    header = (
+        f"{'Field':<{COL[0]}} {'Correct':>{COL[1]}} {'Total':>{COL[2]}}"
+        f" {'Accuracy':>{COL[3]}} {'Avg Confidence':>{COL[4]}}"
+    )
+    sep = "-" * len(header)
+    print()
+    print(header)
+    print(sep)
 
-        llm_result = actual_data.get("llm_result")
-        if not isinstance(llm_result, dict) or not llm_result.get("llm_enabled"):
-            llm_labels_skipped += 1
-            continue
-
-        llm_labels_scored += 1
-
-        for field in FIELDS_TO_COMPARE:
-            if not has_ground_truth(expected_data, field):
-                continue
-
-            llm_field_totals[field] += 1
-            passed = compare_field(llm_result, expected_data, field)
-            rule_passed = rule_field_results[field]
-
-            if is_gold_label:
-                gold_openai_totals[field] += 1
-                if passed:
-                    gold_openai_correct[field] += 1
-
-            if rule_passed and passed:
-                hybrid_counts[field]["both_passed"] += 1
-            elif rule_passed:
-                hybrid_counts[field]["rule_only"] += 1
-            elif passed:
-                hybrid_counts[field]["openai_only"] += 1
-            else:
-                hybrid_counts[field]["both_failed"] += 1
-
-            if passed:
-                llm_field_passes[field] += 1
-            else:
-                llm_failures.append(
-                    {
-                        "label": str(image_path),
-                        "field": field,
-                        "expected": expected_data.get(field, ""),
-                        "actual": llm_result.get(field, ""),
-                    }
-                )
-
-    print("\n=================================")
-    print("RULE-BASED RESULTS")
-    print("=================================")
-    print(f"Labels tested: {labels_tested}")
+    overall_correct = overall_total = overall_conf_count = 0
+    overall_conf_sum = 0.0
 
     for field in FIELDS_TO_COMPARE:
-        total = field_totals[field]
-        passed = field_passes[field]
-        accuracy = (passed / total * 100) if total else 0
+        correct = field_correct[field]
+        total = field_total[field]
+        pct = f"{correct / total * 100:.1f}%" if total else "—"
+        avg_conf = (
+            f"{field_conf_sum[field] / field_conf_count[field]:.2f}"
+            if field_conf_count[field]
+            else "—"
+        )
+        print(
+            f"{field:<{COL[0]}} {correct:>{COL[1]}} {total:>{COL[2]}}"
+            f" {pct:>{COL[3]}} {avg_conf:>{COL[4]}}"
+        )
+        overall_correct += correct
+        overall_total += total
+        overall_conf_sum += field_conf_sum[field]
+        overall_conf_count += field_conf_count[field]
 
-        readable_name = field.replace("_", " ").title()
-        print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
+    print(sep)
+    overall_pct = f"{overall_correct / overall_total * 100:.1f}%" if overall_total else "—"
+    overall_avg = (
+        f"{overall_conf_sum / overall_conf_count:.2f}" if overall_conf_count else "—"
+    )
+    print(
+        f"{'OVERALL':<{COL[0]}} {overall_correct:>{COL[1]}} {overall_total:>{COL[2]}}"
+        f" {overall_pct:>{COL[3]}} {overall_avg:>{COL[4]}}"
+    )
 
+    # ── Per-source accuracy ───────────────────────────────────────────────────
+    print()
+    print("Per-source accuracy:")
+    src_h = f"  {'Source':<14} {'Correct':>9} {'Total':>7} {'Accuracy':>9}"
+    print(src_h)
+    print("  " + "-" * (len(src_h) - 2))
+    for src in sorted(source_total):
+        correct = source_correct.get(src, 0)
+        total = source_total[src]
+        pct = f"{correct / total * 100:.1f}%" if total else "—"
+        print(f"  {src:<14} {correct:>9} {total:>7} {pct:>9}")
+
+    # ── Confidence calibration ────────────────────────────────────────────────
+    print()
+    print("Confidence calibration:")
+    cal_h = f"  {'Group':<14} {'Correct':>9} {'Total':>7} {'Accuracy':>9}"
+    print(cal_h)
+    print("  " + "-" * (len(cal_h) - 2))
+    for _, lbl in conf_buckets:
+        correct = bucket_correct[lbl]
+        total = bucket_total[lbl]
+        pct = f"{correct / total * 100:.1f}%" if total else "—"
+        print(f"  {lbl:<14} {correct:>9} {total:>7} {pct:>9}")
+
+    # ── Failed labels ─────────────────────────────────────────────────────────
     if failures:
-        print("\nFailures:")
-
-        for failure in failures:
+        print()
+        print("Failed labels:")
+        fail_h = (
+            f"  {'label_id':<36}  {'field':<18}  {'extracted':<22}"
+            f"  {'ground_truth':<22}  {'conf':>6}  source"
+        )
+        print(fail_h)
+        print("  " + "-" * (len(fail_h) - 2))
+        for fail in failures:
+            conf = (
+                f"{fail['confidence']:.2f}" if fail["confidence"] is not None else "—"
+            )
             print(
-                f"- {failure['label']} | {failure['field']} | "
-                f"expected={failure['expected']!r} | actual={failure['actual']!r}"
+                f"  {fail['label_id']:<36}  {fail['field']:<18}"
+                f"  {repr(fail['extracted'] or '')[:20]:<22}"
+                f"  {repr(fail['ground_truth'] or '')[:20]:<22}"
+                f"  {conf:>6}  {fail['source']}"
             )
     else:
-        print("\nAll fields matched expected values.")
-
-    print_failure_analysis(failures)
-
-    if OCR_DIAGNOSTICS:
-        print_ocr_failure_diagnostics(ocr_failure_diagnostics)
-
-    print("\n=================================")
-    print("OPENAI RESULTS")
-    print("=================================")
-
-    if not EVALUATE_LLM:
-        print("OpenAI scoring skipped. Set EVALUATE_LLM=true to enable it.")
-    else:
-        print(f"Labels scored: {llm_labels_scored}")
-        print(f"Labels skipped: {llm_labels_skipped}")
-
-        for field in FIELDS_TO_COMPARE:
-            total = llm_field_totals[field]
-            passed = llm_field_passes[field]
-            accuracy = (passed / total * 100) if total else 0
-
-            readable_name = field.replace("_", " ").title()
-            print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
-
-        if llm_failures:
-            print("\nFailures:")
-
-            for failure in llm_failures:
-                print(
-                    f"- {failure['label']} | {failure['field']} | "
-                    f"expected={failure['expected']!r} | "
-                    f"actual={failure['actual']!r}"
-                )
-        elif llm_labels_scored:
-            print("\nAll fields matched expected values.")
-        else:
-            print("\nNo enabled OpenAI results were available to score.")
-
-    print("\n=================================")
-    print("SELECTED RESULTS")
-    print("=================================")
-    print(f"Labels scored: {selected_labels_scored}")
-    print(f"Labels skipped: {selected_labels_skipped}")
-
-    if selected_labels_scored:
-        for field in FIELDS_TO_COMPARE:
-            total = selected_field_totals[field]
-            passed = selected_field_passes[field]
-            accuracy = (passed / total * 100) if total else 0
-
-            readable_name = field.replace("_", " ").title()
-            print(f"{readable_name} Accuracy: {accuracy:.1f}% ({passed}/{total})")
-
-        if selected_failures:
-            print("\nFailures:")
-
-            for failure in selected_failures:
-                print(
-                    f"- {failure['label']} | {failure['field']} | "
-                    f"expected={failure['expected']!r} | "
-                    f"actual={failure['actual']!r}"
-                )
-        else:
-            print("\nAll fields matched expected values.")
-    else:
-        print("No selected_result objects were available to score.")
-
-    print("\n=================================")
-    print("GOLD SET RESULTS")
-    print("=================================")
-
-    if not gold_set_configured:
-        print("Gold Set: not configured")
-    else:
-        print("RULE-BASED")
-        print_gold_metrics(gold_rule_totals, gold_rule_correct)
-        print("\nOPENAI")
-
-        if EVALUATE_LLM:
-            print_gold_metrics(gold_openai_totals, gold_openai_correct)
-        else:
-            print("OpenAI scoring skipped. Set EVALUATE_LLM=true to enable it.")
-
-        print("\nSELECTED")
-        if selected_labels_scored:
-            print_gold_metrics(gold_selected_totals, gold_selected_correct)
-        else:
-            print("No selected_result objects were available to score.")
-
-    if EVALUATE_LLM:
-        print("\n=================================")
-        print("HYBRID FIELD COMPARISON")
-        print("=================================")
-
-        for field in FIELDS_TO_COMPARE:
-            counts = hybrid_counts[field]
-
-            if counts["openai_only"] > counts["rule_only"]:
-                suggested_source = "OpenAI"
-            elif counts["rule_only"] > counts["openai_only"]:
-                suggested_source = "Rule-Based"
-            else:
-                suggested_source = "Tie / Needs Review"
-
-            readable_name = field.replace("_", " ").title()
-            print(f"\n{readable_name}:")
-            print(f"  Rule only: {counts['rule_only']}")
-            print(f"  OpenAI only: {counts['openai_only']}")
-            print(f"  Both passed: {counts['both_passed']}")
-            print(f"  Both failed: {counts['both_failed']}")
-            print(f"  Suggested source: {suggested_source}")
+        print()
+        print("No failures — all annotated fields matched extracted values.")
 
 
 if __name__ == "__main__":
