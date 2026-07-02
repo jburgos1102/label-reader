@@ -46,9 +46,9 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 # ---------------------------------------------------------------------------
 
 TRAINING_DATA = Path(__file__).parent / "training_data" / "dataset.jsonl"
-MODEL_DIR     = Path(__file__).parent / "models" / "label_reader"
-ONNX_PATH     = Path(__file__).parent / "models" / "label_reader.onnx"
-BASE_MODEL    = "distilbert-base-uncased"
+MODEL_DIR = Path(__file__).parent / "models" / "label_reader"
+ONNX_PATH = Path(__file__).parent / "models" / "label_reader.onnx"
+BASE_MODEL = "distilbert-base-uncased"
 
 # ---------------------------------------------------------------------------
 # Label schema
@@ -56,12 +56,16 @@ BASE_MODEL    = "distilbert-base-uncased"
 
 LABELS = [
     "O",
-    "B-NAME",    "I-NAME",
-    "B-STREET",  "I-STREET",
-    "B-CITY",    "I-CITY",
+    "B-NAME",
+    "I-NAME",
+    "B-STREET",
+    "I-STREET",
+    "B-CITY",
+    "I-CITY",
     "B-STATE",
     "B-ZIP",
-    "B-TRACKING", "I-TRACKING",
+    "B-TRACKING",
+    "I-TRACKING",
     "B-CARRIER",
 ]
 
@@ -71,6 +75,7 @@ ID2LABEL = {i: l for i, l in enumerate(LABELS)}
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+
 
 def load_examples(path: Path) -> list[dict]:
     examples = []
@@ -88,7 +93,9 @@ def split_dataset(examples: list[dict], test_size: float = 0.2, seed: int = 42):
     If fewer than 25 examples, train on everything (report training accuracy only).
     """
     if len(examples) < 25:
-        print(f"⚠️  Only {len(examples)} examples — training on full dataset, no held-out test set.")
+        print(
+            f"⚠️  Only {len(examples)} examples — training on full dataset, no held-out test set."
+        )
         return examples, []
 
     train, test = train_test_split(examples, test_size=test_size, random_state=seed)
@@ -98,6 +105,7 @@ def split_dataset(examples: list[dict], test_size: float = 0.2, seed: int = 42):
 # ---------------------------------------------------------------------------
 # Tokenization + label alignment
 # ---------------------------------------------------------------------------
+
 
 def tokenize_and_align(batch, tokenizer):
     """
@@ -143,9 +151,11 @@ def tokenize_and_align(batch, tokenizer):
 # Evaluation metric (seqeval)
 # ---------------------------------------------------------------------------
 
+
 def make_compute_metrics(tokenizer):
     try:
         from seqeval.metrics import classification_report, f1_score
+
         use_seqeval = True
     except ImportError:
         use_seqeval = False
@@ -172,13 +182,25 @@ def make_compute_metrics(tokenizer):
             f1 = f1_score(true_labels, pred_labels)
             report = classification_report(true_labels, pred_labels, output_dict=True)
             result = {"f1": f1}
-            for entity in ["NAME", "STREET", "CITY", "STATE", "ZIP", "TRACKING", "CARRIER"]:
+            for entity in [
+                "NAME",
+                "STREET",
+                "CITY",
+                "STATE",
+                "ZIP",
+                "TRACKING",
+                "CARRIER",
+            ]:
                 if entity in report:
                     result[f"f1_{entity.lower()}"] = report[entity]["f1-score"]
             return result
         else:
-            correct = sum(t == p for ts, ps in zip(true_labels, pred_labels) for t, p in zip(ts, ps))
-            total   = sum(len(ts) for ts in true_labels)
+            correct = sum(
+                t == p
+                for ts, ps in zip(true_labels, pred_labels)
+                for t, p in zip(ts, ps)
+            )
+            total = sum(len(ts) for ts in true_labels)
             return {"accuracy": correct / total if total else 0}
 
     return compute_metrics
@@ -187,6 +209,7 @@ def make_compute_metrics(tokenizer):
 # ---------------------------------------------------------------------------
 # ONNX export
 # ---------------------------------------------------------------------------
+
 
 def export_onnx(model, tokenizer, onnx_path: Path):
     import torch
@@ -198,7 +221,7 @@ def export_onnx(model, tokenizer, onnx_path: Path):
         truncation=True,
         max_length=64,
     )
-    input_ids      = dummy_input["input_ids"]
+    input_ids = dummy_input["input_ids"]
     attention_mask = dummy_input["attention_mask"]
 
     onnx_path.parent.mkdir(parents=True, exist_ok=True)
@@ -210,9 +233,9 @@ def export_onnx(model, tokenizer, onnx_path: Path):
         input_names=["input_ids", "attention_mask"],
         output_names=["logits"],
         dynamic_axes={
-            "input_ids":      {0: "batch", 1: "sequence"},
+            "input_ids": {0: "batch", 1: "sequence"},
             "attention_mask": {0: "batch", 1: "sequence"},
-            "logits":         {0: "batch", 1: "sequence"},
+            "logits": {0: "batch", 1: "sequence"},
         },
         opset_version=14,
         do_constant_folding=True,
@@ -224,21 +247,33 @@ def export_onnx(model, tokenizer, onnx_path: Path):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune DistilBERT for shipping label NER")
-    parser.add_argument("--data",       default=str(TRAINING_DATA), help="Path to dataset.jsonl")
-    parser.add_argument("--model-dir",  default=str(MODEL_DIR),     help="Where to save the trained model")
-    parser.add_argument("--epochs",     type=int,   default=8,      help="Training epochs (increase with more data)")
-    parser.add_argument("--batch-size", type=int,   default=8,      help="Training batch size")
-    parser.add_argument("--lr",         type=float, default=5e-5,   help="Learning rate")
-    parser.add_argument("--no-onnx",    action="store_true",        help="Skip ONNX export")
-    parser.add_argument("--seed",       type=int,   default=42)
+    parser = argparse.ArgumentParser(
+        description="Fine-tune DistilBERT for shipping label NER"
+    )
+    parser.add_argument(
+        "--data", default=str(TRAINING_DATA), help="Path to dataset.jsonl"
+    )
+    parser.add_argument(
+        "--model-dir", default=str(MODEL_DIR), help="Where to save the trained model"
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=8,
+        help="Training epochs (increase with more data)",
+    )
+    parser.add_argument("--batch-size", type=int, default=8, help="Training batch size")
+    parser.add_argument("--lr", type=float, default=5e-5, help="Learning rate")
+    parser.add_argument("--no-onnx", action="store_true", help="Skip ONNX export")
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     set_seed(args.seed)
 
-    data_path  = Path(args.data)
-    model_dir  = Path(args.model_dir)
+    data_path = Path(args.data)
+    model_dir = Path(args.model_dir)
 
     if not data_path.exists():
         print(f"Dataset not found at {data_path}")
@@ -255,10 +290,12 @@ def main():
 
     # Build HuggingFace datasets
     def to_hf(exs):
-        return Dataset.from_dict({
-            "tokens": [e["tokens"] for e in exs],
-            "labels": [e["labels"] for e in exs],
-        })
+        return Dataset.from_dict(
+            {
+                "tokens": [e["tokens"] for e in exs],
+                "labels": [e["labels"] for e in exs],
+            }
+        )
 
     splits = {"train": to_hf(train_examples)}
     if test_examples:
@@ -268,7 +305,7 @@ def main():
     # Tokenizer + model
     print(f"\nLoading base model: {BASE_MODEL}")
     tokenizer = DistilBertTokenizerFast.from_pretrained(BASE_MODEL)
-    model     = DistilBertForTokenClassification.from_pretrained(
+    model = DistilBertForTokenClassification.from_pretrained(
         BASE_MODEL,
         num_labels=len(LABELS),
         id2label=ID2LABEL,
@@ -307,7 +344,7 @@ def main():
         args=training_args,
         train_dataset=tokenized["train"],
         eval_dataset=tokenized.get("test"),
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         data_collator=data_collator,
         compute_metrics=make_compute_metrics(tokenizer) if test_examples else None,
     )
@@ -334,6 +371,7 @@ def main():
     if not args.no_onnx:
         try:
             import torch
+
             export_onnx(model, tokenizer, ONNX_PATH)
             print("Run  python ml/export_coreml.py  to convert to CoreML for iOS.")
         except ImportError:
