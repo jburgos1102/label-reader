@@ -1,0 +1,20 @@
+{
+  "id2label": {
+    "0": "O", "1": "B-NAME", "2": "I-NAME",
+    "3": "B-STREET", "4": "I-STREET",
+    "5": "B-CITY", "6": "I-CITY",
+    "7": "B-STATE", "8": "B-ZIP",
+    "9": "B-TRACKING", "10": "I-TRACKING",
+    "11": "B-CARRIER"
+  },
+  "label2id": {
+    "O": 0, "B-NAME": 1, "I-NAME": 2,
+    "B-STREET": 3, "I-STREET": 4,
+    "B-CITY": 5, "I-CITY": 6,
+    "B-STATE": 7, "B-ZIP": 8,
+    "B-TRACKING": 9, "I-TRACKING": 10,
+    "B-CARRIER": 11
+  },
+  "seq_len": 64,
+  "fields": ["recipient_name", "street_address", "city", "state", "zip_code", "tracking_number", "carrier"]
+}

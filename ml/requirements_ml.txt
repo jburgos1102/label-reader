@@ -8,6 +8,7 @@ seqeval>=1.2.2
 numpy>=1.24.0
 scikit-learn>=1.3.0
 accelerate>=1.1.0
+onnxscript
 
 # CoreML export (macOS only)
 coremltools>=7.1

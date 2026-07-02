@@ -215,6 +215,7 @@ def export_onnx(model, tokenizer, onnx_path: Path):
     import torch
 
     model.eval()
+    model = model.to("cpu")
     dummy_input = tokenizer(
         ["JOHN SMITH 123 MAIN ST CHICAGO IL 60601"],
         return_tensors="pt",
