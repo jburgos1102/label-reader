@@ -5,3 +5,5 @@ uploads/
 .env
 captures/
 label_storage.db
+ml/training_data/
+ml/models/
