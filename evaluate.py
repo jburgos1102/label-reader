@@ -460,6 +460,8 @@ def main():
     bucket_total = {lbl: 0 for _, lbl in conf_buckets}
 
     failures = []
+    dataset_fields_excluded = 0
+    dataset_rows = set()
 
     for label in labels:
         gt = label["ground_truth"]  # already a dict
@@ -473,6 +475,14 @@ def main():
             gt_val = gt[field]
             confidence = label.get(f"{field}_confidence")
             source = label.get(f"{field}_source") or ""
+
+            # Rows imported by ml/import_datasets.py store the ground truth in
+            # the extracted columns (source='dataset'), so scoring them would
+            # count as correct by construction. Exclude them from accuracy.
+            if source == "dataset":
+                dataset_fields_excluded += 1
+                dataset_rows.add(label_id)
+                continue
 
             is_correct = (
                 (extracted_val or "").strip().lower()
@@ -511,6 +521,13 @@ def main():
                         "source": source,
                     }
                 )
+
+    if dataset_fields_excluded:
+        print(
+            f"Excluded {dataset_fields_excluded} field values across "
+            f"{len(dataset_rows)} dataset-imported labels (source='dataset': "
+            f"extracted columns hold ground truth, so they cannot be scored)"
+        )
 
     # ── Per-field accuracy table ──────────────────────────────────────────────
     COL = (20, 9, 7, 10, 15)
