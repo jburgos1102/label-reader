@@ -6,6 +6,8 @@ import time
 
 import cv2
 import numpy as np
+
+import config
 from label_reader import extract_label_data
 from logger import log
 
@@ -20,7 +22,7 @@ def find_label_contour(frame):
         cv2.RETR_EXTERNAL,
         cv2.CHAIN_APPROX_SIMPLE,
     )
-    minimum_area = frame.shape[0] * frame.shape[1] * 0.10
+    minimum_area = frame.shape[0] * frame.shape[1] * config.CAMERA_MIN_AREA_RATIO
 
     # Prefer the largest substantial four-sided region in the frame.
     for contour in sorted(contours, key=cv2.contourArea, reverse=True):
@@ -126,7 +128,7 @@ def main():
     capture_directory.mkdir(exist_ok=True)
 
     camera = cv2.VideoCapture(0)
-    detection_history = deque(maxlen=10)
+    detection_history = deque(maxlen=config.CAMERA_HISTORY_FRAMES)
     last_valid_contour = None
     detection_started_at = None
     capture_locked = False
@@ -156,15 +158,17 @@ def main():
                 last_valid_contour = label_contour
                 cv2.polylines(frame, [label_contour], True, (0, 255, 255), 3)
 
-            label_detected = sum(detection_history) >= 3
+            label_detected = sum(detection_history) >= config.CAMERA_HISTORY_THRESHOLD
             current_time = time.monotonic()
 
             if label_detected:
                 if detection_started_at is None:
                     detection_started_at = current_time
 
-                stable_for_two_seconds = current_time - detection_started_at >= 2.0
-                if stable_for_two_seconds and not capture_locked:
+                stable_long_enough = (
+                    current_time - detection_started_at >= config.CAMERA_STABLE_SECONDS
+                )
+                if stable_long_enough and not capture_locked:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     capture_path = capture_directory / f"captured_label_{timestamp}.jpg"
                     crop_path = capture_directory / f"cropped_label_{timestamp}.jpg"

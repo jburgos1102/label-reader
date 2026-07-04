@@ -8,9 +8,6 @@ GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_TIMEOUT = 30.0
 
-# When the overall rule-based confidence falls below this threshold, call the LLM.
-LLM_CONFIDENCE_THRESHOLD = 0.70
-
 # Rule-based per-field confidence values
 TRACKING_MIN_LENGTH = 15
 CONFIDENCE_TRACKING_HIGH = 0.95
@@ -22,7 +19,6 @@ CONFIDENCE_STREET_LOW = 0.45
 CONFIDENCE_CITY_HIGH = 0.85
 CONFIDENCE_CITY_LOW = 0.45
 CONFIDENCE_STATE_VALID = 0.95
-CONFIDENCE_ZIP_VALID = 0.95   # reserved for barcode-sourced zip (future)
 CONFIDENCE_ZIP_OCR = 0.78     # 5-digit format match only; single misread digit still passes
 
 # LLM cross-validation against OCR text
@@ -43,7 +39,6 @@ CAMERA_HISTORY_THRESHOLD = 3
 OCR_CONFIDENCE_VISION_THRESHOLD = 60   # Tesseract mean confidence (0–100); below → use vision
 OCR_TEXT_LENGTH_VISION_THRESHOLD = 50  # chars; shorter OCR output likely needs vision
 VISION_TRIGGER_BLANK_FIELDS = 3        # blank/zero-confidence address fields → use vision
-VISION_TRIGGER_NAME_LOOKS_LIKE_STREET = True  # recipient_name contains a street suffix word → use vision
 CONFIDENCE_TRACKING_CHECKSUM_FAIL = 0.30  # tracking number failed checksum validation
 
 # OCR early-exit threshold — stop rotation loop once this confidence is reached
