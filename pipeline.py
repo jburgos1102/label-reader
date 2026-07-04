@@ -102,7 +102,9 @@ def run(image_path, skip_llm=False):
         _checksum_valid,
     )
 
-    # Determine whether vision LLM should be used instead of (or despite) skip_llm
+    # Determine whether the vision LLM should be used instead of the text LLM.
+    # skip_llm is authoritative: when set, neither mode runs (computed anyway
+    # so the trigger decision is still visible in debug logs).
     _address_fields = ("city", "state", "street_address", "zip_code")
     _scored_conf = label_data.get("confidence", {})
     blank_address_fields = sum(
@@ -158,15 +160,17 @@ def run(image_path, skip_llm=False):
             "llm_notes": notes,
         }
 
-    if use_vision:
+    if skip_llm:
+        # Authoritative switch: no LLM call of any kind, even when the vision
+        # trigger fired (previously vision ran despite skip_llm).
+        llm_result = _skip_stub("LLM skipped for camera scan.")
+    elif use_vision:
         try:
             llm_result = extract_fields_with_llm(ocr_text, label_data, image=image_bytes)
             llm_mode = "vision"
         except Exception:
             log.exception("Vision LLM extraction failed; using rule-based result")
             llm_result = _skip_stub("Vision LLM extraction failed; using rule-based result.")
-    elif skip_llm:
-        llm_result = _skip_stub("LLM skipped for camera scan.")
     else:
         try:
             llm_result = extract_fields_with_llm(ocr_text, label_data)
