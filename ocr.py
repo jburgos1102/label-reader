@@ -1,6 +1,8 @@
+import re
+import threading
+
 import pytesseract
 from pytesseract import Output
-import re
 
 from PIL import Image
 
@@ -8,17 +10,23 @@ import config
 from logger import log
 
 
-_last_ocr_diagnostics = {
+# Thread-local: Flask serves concurrent requests on separate threads, so
+# module-level state here would mix diagnostics across requests.
+_local = threading.local()
+
+_EMPTY_DIAGNOSTICS = {
     "selected_text": "",
     "rotations": {},
 }
 
 
 def get_last_ocr_diagnostics():
-    """Return a copy of the rotation texts from the most recent OCR call."""
+    """Return a copy of the rotation texts from the most recent OCR call
+    on the current thread."""
+    diagnostics = getattr(_local, "last_ocr_diagnostics", _EMPTY_DIAGNOSTICS)
     return {
-        "selected_text": _last_ocr_diagnostics["selected_text"],
-        "rotations": dict(_last_ocr_diagnostics["rotations"]),
+        "selected_text": diagnostics["selected_text"],
+        "rotations": dict(diagnostics["rotations"]),
     }
 
 
@@ -138,8 +146,6 @@ def get_best_ocr_text(image):
     rotation clears the threshold, the rotation with the best score_ocr_text
     score is returned (existing fallback behaviour).
     """
-    global _last_ocr_diagnostics
-
     if max(image.size) > config.OCR_MAX_IMAGE_PX:
         scale = config.OCR_TARGET_IMAGE_PX / max(image.size)
         new_size = (round(image.width * scale), round(image.height * scale))
@@ -183,7 +189,7 @@ def get_best_ocr_text(image):
                 )
                 break
 
-    _last_ocr_diagnostics = {
+    _local.last_ocr_diagnostics = {
         "selected_text": best_text,
         "rotations": rotation_texts,
     }
