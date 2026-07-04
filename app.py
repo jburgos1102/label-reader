@@ -13,10 +13,21 @@ app = Flask(__name__)
 
 UPLOAD_FOLDER = "uploads"
 
+# Reject request bodies larger than this before they reach the pipeline.
+app.config["MAX_CONTENT_LENGTH"] = 20 * 1024 * 1024  # 20 MB
+
 try:
     storage.init_db()
 except Exception:
     log.warning("Storage initialization failed; label results will not be persisted")
+
+
+@app.errorhandler(413)
+def request_too_large(error):
+    message = "The uploaded image is too large (limit is 20 MB)."
+    if request.path.startswith("/api/"):
+        return jsonify({"error": message}), 413
+    return render_template("index.html", label_data=None, error_message=message), 413
 
 
 def _save_upload(uploaded_file):
@@ -24,7 +35,10 @@ def _save_upload(uploaded_file):
     if not filename:
         raise ValueError("invalid filename")
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-    path = os.path.join(UPLOAD_FOLDER, filename)
+    # Store under a unique name: concurrent uploads sharing an original
+    # filename would otherwise overwrite each other mid-processing.
+    extension = os.path.splitext(filename)[1].lower()
+    path = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}{extension}")
     uploaded_file.save(path)
     return path
 
