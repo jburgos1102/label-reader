@@ -751,12 +751,11 @@ def parse_address_from_lines(lines):
 
                             break
 
-        if "18974" in line:
-            log.debug("ZIP-first parts: %s", parts)
-
         if len(parts) >= 6:
             zip_match = re.fullmatch(r"\d{5}", parts[0])
-            separator_match = re.fullmatch(r"[-–—]", parts[1])
+            # TODO: parts[1] (the ZIP+4 separator) was matched but never
+            # checked, so this parser accepts any token there. Validating it
+            # would change behavior — deferred to the parser rework.
             plus_four_match = re.fullmatch(r"\d{4}", parts[2])
             state_match = re.fullmatch(r"[A-Z]{2}", parts[5])
 

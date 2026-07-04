@@ -8,17 +8,14 @@ import storage
 
 
 EVALUATE_LLM = os.getenv("EVALUATE_LLM", "").strip().lower() == "true"
-OCR_DIAGNOSTICS = os.getenv("OCR_DIAGNOSTICS", "").strip().lower() == "true"
 
 if not EVALUATE_LLM:
     os.environ["OPENAI_API_KEY"] = ""
 
+# extract_label_data is re-exported: regression_test.py imports it from here.
 from label_reader import extract_label_data
-from ocr import get_last_ocr_diagnostics
-from pipeline import build_extraction_result
 
 DATASETS_DIR = Path("datasets")
-GOLD_SET_PATH = DATASETS_DIR / "gold_set.txt"
 FIELDS_TO_COMPARE = [
     "recipient_name",
     "street_address",
@@ -28,13 +25,6 @@ FIELDS_TO_COMPARE = [
     "tracking_number",
     "carrier",
 ]
-OCR_DIAGNOSTIC_FIELDS = (
-    "recipient_name",
-    "street_address",
-    "city",
-    "state",
-    "zip_code",
-)
 
 
 IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png"]
@@ -71,83 +61,6 @@ SENDER_MARKERS = (
     "SHIP FROM",
     "SENDER ADDRESS",
 )
-
-GOLD_FIELD_LABELS = {
-    "zip_code": "ZIP",
-    "tracking_number": "Tracking",
-}
-
-
-def normalize_image_path(image_path):
-    normalized = os.path.normpath(str(image_path).strip())
-    return Path(normalized).as_posix().casefold()
-
-
-def load_gold_set():
-    if not GOLD_SET_PATH.exists():
-        return set()
-
-    gold_paths = set()
-    with GOLD_SET_PATH.open("r", encoding="utf-8") as file:
-        for line in file:
-            candidate = line.strip()
-            if candidate and not candidate.startswith("#"):
-                gold_paths.add(normalize_image_path(candidate))
-
-    return gold_paths
-
-
-def print_gold_metrics(field_totals, field_correct):
-    for field in FIELDS_TO_COMPARE:
-        total = field_totals[field]
-        correct = field_correct[field]
-        accuracy = (correct / total * 100) if total else 0
-        readable_name = GOLD_FIELD_LABELS.get(
-            field,
-            field.replace("_", " ").title(),
-        )
-        print(f"{readable_name} Accuracy: {accuracy:.1f}% ({correct}/{total})")
-
-
-def print_failure_analysis(failures):
-    failures_by_field = {field: [] for field in FIELDS_TO_COMPARE}
-
-    for failure in failures:
-        field = failure.get("field")
-        if field in failures_by_field:
-            failures_by_field[field].append(failure)
-
-    ranked_fields = sorted(
-        FIELDS_TO_COMPARE,
-        key=lambda field: (
-            -len(failures_by_field[field]),
-            FIELDS_TO_COMPARE.index(field),
-        ),
-    )
-
-    print("\n=================================")
-    print("FAILURE ANALYSIS")
-    print("=================================")
-    print("Failure Counts By Field:")
-
-    for field in ranked_fields:
-        print(f"{field}: {len(failures_by_field[field])}")
-
-    print("\nTop Examples:")
-
-    for field in ranked_fields:
-        field_failures = failures_by_field[field]
-        if not field_failures:
-            continue
-
-        print(f"\n{field}:")
-        for failure in field_failures[:5]:
-            expected = json.dumps(failure.get("expected", ""), ensure_ascii=False)
-            actual = json.dumps(failure.get("actual", ""), ensure_ascii=False)
-            print(f"- {failure['label']}")
-            print(f"  expected: {expected}")
-            print(f"  actual: {actual}")
-
 
 def normalize_value(value):
     if value is None:
@@ -330,74 +243,6 @@ def compare_field(actual_data, expected_data, field_name):
         return compare_tracking_number(actual_value, expected_value)
 
     return normalize_value(actual_value) == normalize_value(expected_value)
-
-
-def expected_value_in_ocr(expected_value, ocr_text, field_name):
-    if field_name == "zip_code":
-        expected = re.sub(r"\D", "", str(expected_value or ""))
-        text = re.sub(r"\D", "", str(ocr_text or ""))
-        return bool(expected and expected in text)
-
-    expected = normalize_value(expected_value)
-    text = normalize_value(ocr_text)
-    if not expected:
-        return False
-
-    pattern = rf"(?<![A-Z0-9]){re.escape(expected)}(?![A-Z0-9])"
-    return bool(re.search(pattern, text))
-
-
-def build_ocr_failure_diagnostic(label, field, expected_value):
-    ocr_diagnostics = get_last_ocr_diagnostics()
-    selected_text = ocr_diagnostics.get("selected_text", "")
-    rotation_texts = ocr_diagnostics.get("rotations", {})
-    return {
-        "label": label,
-        "field": field,
-        "expected": expected_value,
-        "selected": expected_value_in_ocr(expected_value, selected_text, field),
-        "rotations": {
-            degrees: expected_value_in_ocr(
-                expected_value,
-                rotation_texts.get(degrees, ""),
-                field,
-            )
-            for degrees in (0, 90, 180, 270)
-        },
-    }
-
-
-def print_ocr_failure_diagnostics(diagnostics):
-    print("\n=================================")
-    print("OCR FAILURE DIAGNOSTICS")
-    print("=================================")
-    print("Showing up to 5 failed labels per field.")
-
-    shown_by_field = {field: 0 for field in OCR_DIAGNOSTIC_FIELDS}
-    shown_any = False
-
-    for diagnostic in diagnostics:
-        field = diagnostic["field"]
-        if shown_by_field[field] >= 5:
-            continue
-
-        shown_by_field[field] += 1
-        shown_any = True
-        print(f"\n{diagnostic['label']}")
-        print(f"{field} expected: {diagnostic['expected']}")
-        print(
-            "selected OCR contained expected: "
-            f"{str(diagnostic['selected']).lower()}"
-        )
-        for degrees in (0, 90, 180, 270):
-            contained = diagnostic["rotations"][degrees]
-            print(
-                f"rotation {degrees} contained expected: "
-                f"{str(contained).lower()}"
-            )
-
-    if not shown_any:
-        print("No eligible OCR field failures were found.")
 
 
 def main():
