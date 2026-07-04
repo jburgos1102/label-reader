@@ -1,0 +1,1625 @@
+{
+  "fedex_001": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.4,
+          "source": "agreement",
+          "value": "FEDEX"
+        },
+        "city": {
+          "confidence": 0.45,
+          "source": "agreement",
+          "value": "To: Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.45,
+          "source": "rule",
+          "value": "Mohacsi, Aide"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.4,
+          "source": "barcode",
+          "value": "484542089524"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.4,
+          "source": "agreement",
+          "value": "FEDEX"
+        },
+        "city": {
+          "confidence": 0.45,
+          "source": "agreement",
+          "value": "To: Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM CONFLICT NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.4,
+          "source": "barcode",
+          "value": "484542089524"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.4,
+          "source": "rule",
+          "value": "FEDEX"
+        },
+        "city": {
+          "confidence": 0.45,
+          "source": "rule",
+          "value": "To: Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.45,
+          "source": "rule",
+          "value": "Mohacsi, Aide"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.4,
+          "source": "barcode",
+          "value": "484542089524"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "17013"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    }
+  },
+  "speedx_001": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.0,
+          "source": "agreement",
+          "value": "SpeedX"
+        },
+        "city": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLMVILLE"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM FILLED NAME"
+        },
+        "state": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "ZZ"
+        },
+        "street_address": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "123 LLM FILL ST"
+        },
+        "tracking_number": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": "1Z999AA10123456784"
+        },
+        "zip_code": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "99999"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "city",
+            "recipient_name",
+            "state",
+            "street_address",
+            "tracking_number",
+            "zip_code"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": [
+            "blank_address_fields"
+          ]
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.0,
+          "source": "agreement",
+          "value": "SpeedX"
+        },
+        "city": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLMVILLE"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM FILLED NAME"
+        },
+        "state": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "ZZ"
+        },
+        "street_address": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "123 LLM FILL ST"
+        },
+        "tracking_number": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": "1Z999AA10123456784"
+        },
+        "zip_code": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "99999"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "city",
+            "recipient_name",
+            "state",
+            "street_address",
+            "tracking_number",
+            "zip_code"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": [
+            "blank_address_fields"
+          ]
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.0,
+          "source": "rule",
+          "value": "SpeedX"
+        },
+        "city": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "recipient_name": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "state": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "street_address": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "tracking_number": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "zip_code": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": [
+            "blank_address_fields"
+          ]
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    }
+  },
+  "ups_001": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM FILLED NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "DICKINSON COLLEGE 28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "barcode",
+          "value": "1Z3Y16E50330476272"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2311"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM FILLED NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "DICKINSON COLLEGE 28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "barcode",
+          "value": "1Z3Y16E50330476272"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2311"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "DICKINSON COLLEGE 28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "barcode",
+          "value": "1Z3Y16E50330476272"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "17013-2311"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    }
+  },
+  "ups_002": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Benjamin Plawker"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "HUB # 1610 DICKINSON COLLEGE 28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "1Z09271R0305043279"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2311"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM CONFLICT NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "HUB # 1610 DICKINSON COLLEGE 28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "1Z09271R0305043279"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2311"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Benjamin Plawker"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "HUB # 1610 DICKINSON COLLEGE 28 N COLLEGE ST"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "1Z09271R0305043279"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "17013-2311"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    }
+  },
+  "usps_001": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.0,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM FILLED NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.45,
+          "source": "agreement",
+          "value": "PO"
+        },
+        "tracking_number": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": "1Z999AA10123456784"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2896"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name",
+            "tracking_number"
+          ],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.0,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM FILLED NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.45,
+          "source": "agreement",
+          "value": "PO"
+        },
+        "tracking_number": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": "1Z999AA10123456784"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2896"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name",
+            "tracking_number"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.0,
+          "source": "rule",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.45,
+          "source": "rule",
+          "value": "PO"
+        },
+        "tracking_number": {
+          "confidence": 0.0,
+          "source": "blank",
+          "value": ""
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "17013-2896"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    }
+  },
+  "usps_005": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Cassandra R. Teschner"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "HUB Box 2119 Dickinson College PO Box 1773"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "9505515896319065430303"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2896"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM CONFLICT NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "HUB Box 2119 Dickinson College PO Box 1773"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "9505515896319065430303"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "17013-2896"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Carlisle"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Cassandra R. Teschner"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "HUB Box 2119 Dickinson College PO Box 1773"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "9505515896319065430303"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "17013-2896"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    }
+  },
+  "usps_010": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "University Park"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Lynn Sebulsky"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "105 SPARKS BLDG"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "92612999959677571043181200"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "16802-0000"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "University Park"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM CONFLICT NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "105 SPARKS BLDG"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "92612999959677571043181200"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "16802-0000"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "UPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "University Park"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Lynn Sebulsky"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "105 SPARKS BLDG"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "92612999959677571043181200"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "16802-0000"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 1,
+        "processing_ms": 0
+      }
+    }
+  },
+  "usps_015": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "University Park"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Christina M Diaz"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "212 L SOFTBALL PARK"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "92612909838576581008515982"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "16802"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "University Park"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM CONFLICT NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "212 L SOFTBALL PARK"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "92612909838576581008515982"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "16802"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "University Park"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Christina M Diaz"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "212 L SOFTBALL PARK"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "ocr",
+          "value": "92612909838576581008515982"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "16802"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    }
+  },
+  "usps_021": {
+    "auto": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Warminster"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Lynnette Burgos"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "96 BAIRD STREET"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "barcode",
+          "value": "92612909858661571676171474"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "18974"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [],
+          "latency_ms": 1,
+          "mode": "text",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "auto",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "text",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "force_vision": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "agreement",
+          "value": "Warminster"
+        },
+        "recipient_name": {
+          "confidence": 0.75,
+          "source": "llm",
+          "value": "LLM CONFLICT NAME"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "agreement",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "agreement",
+          "value": "96 BAIRD STREET"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "barcode",
+          "value": "92612909858661571676171474"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "agreement",
+          "value": "18974"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [
+          "recipient_name"
+        ],
+        "llm": {
+          "called": true,
+          "fields_from_llm": [
+            "recipient_name"
+          ],
+          "latency_ms": 1,
+          "mode": "vision",
+          "model": "stub-model",
+          "provider": "stub",
+          "requested_mode": "force_vision",
+          "trigger_reasons": []
+        },
+        "llm_called": true,
+        "llm_mode": "vision",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    },
+    "off": {
+      "extracted": {
+        "carrier": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "USPS"
+        },
+        "city": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Warminster"
+        },
+        "recipient_name": {
+          "confidence": 0.85,
+          "source": "rule",
+          "value": "Lynnette Burgos"
+        },
+        "state": {
+          "confidence": 0.95,
+          "source": "rule",
+          "value": "PA"
+        },
+        "street_address": {
+          "confidence": 0.7,
+          "source": "rule",
+          "value": "96 BAIRD STREET"
+        },
+        "tracking_number": {
+          "confidence": 0.95,
+          "source": "barcode",
+          "value": "92612909858661571676171474"
+        },
+        "zip_code": {
+          "confidence": 0.78,
+          "source": "rule",
+          "value": "18974"
+        }
+      },
+      "label_id": "golden",
+      "metadata": {
+        "conflicts": [],
+        "llm": {
+          "called": false,
+          "fields_from_llm": [],
+          "latency_ms": null,
+          "mode": "none",
+          "model": "",
+          "provider": "none",
+          "requested_mode": "off",
+          "trigger_reasons": []
+        },
+        "llm_called": false,
+        "llm_mode": "none",
+        "ocr_rotations_tried": 4,
+        "processing_ms": 0
+      }
+    }
+  }
+}
