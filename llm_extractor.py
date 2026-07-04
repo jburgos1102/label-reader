@@ -8,15 +8,42 @@ When an image (bytes) is passed the vision model is used; otherwise the text mod
 import base64
 import json
 import os
+import time
 from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 import config
+from logger import log
 
 
 load_dotenv()
+
+
+# Clients are cached per (provider, key, url, timeout) so each request does not
+# pay client construction; the OpenAI client is thread-safe for concurrent use.
+_client_cache: dict[tuple, OpenAI] = {}
+
+
+def _get_client(provider: dict[str, Any]) -> OpenAI:
+    cache_key = (
+        provider["name"],
+        provider["api_key"],
+        provider["base_url"],
+        provider["timeout"],
+    )
+    client = _client_cache.get(cache_key)
+    if client is None:
+        client_kwargs: dict[str, Any] = {
+            "api_key": provider["api_key"],
+            "timeout": provider["timeout"],
+        }
+        if provider["base_url"]:
+            client_kwargs["base_url"] = provider["base_url"]
+        client = OpenAI(**client_kwargs)
+        _client_cache[cache_key] = client
+    return client
 
 
 FIELD_NAMES = (
@@ -178,13 +205,6 @@ def extract_fields_with_llm(
             provider=provider_name,
         )
 
-    client_kwargs: dict[str, Any] = {
-        "api_key": provider["api_key"],
-        "timeout": provider["timeout"],
-    }
-    if provider["base_url"]:
-        client_kwargs["base_url"] = provider["base_url"]
-
     payload = json.dumps(
         {
             "ocr_text": ocr_text,
@@ -204,8 +224,11 @@ def extract_fields_with_llm(
     else:
         user_content = payload
 
+    mode = "vision" if use_vision else "text"
+    started = time.monotonic()
+
     try:
-        client = OpenAI(**client_kwargs)
+        client = _get_client(provider)
         response = client.chat.completions.create(
             model=model,
             messages=[
@@ -215,21 +238,50 @@ def extract_fields_with_llm(
             response_format={"type": "json_object"},
             temperature=0,
         )
+    except Exception:
+        latency_ms = round((time.monotonic() - started) * 1000)
+        log.exception(
+            "LLM API call failed (provider=%s model=%s mode=%s latency_ms=%d)",
+            provider_name, model, mode, latency_ms,
+        )
+        return _safe_result(
+            rule_result,
+            enabled=True,
+            notes=f"{provider_name} API call failed; falling back to rule-based result.",
+            provider=provider_name,
+        )
+
+    latency_ms = round((time.monotonic() - started) * 1000)
+
+    try:
         extracted = json.loads(response.choices[0].message.content)
         if not isinstance(extracted, dict):
             raise ValueError("LLM response was not a JSON object")
     except Exception:
+        log.exception(
+            "LLM response was not valid JSON (provider=%s model=%s mode=%s latency_ms=%d)",
+            provider_name, model, mode, latency_ms,
+        )
         return _safe_result(
             rule_result,
             enabled=True,
-            notes=f"{provider_name} extraction failed; falling back to rule-based result.",
+            notes=f"{provider_name} returned unparseable output; falling back to rule-based result.",
             provider=provider_name,
         )
+
+    log.info(
+        "LLM extraction ok (provider=%s model=%s mode=%s latency_ms=%d)",
+        provider_name, model, mode, latency_ms,
+    )
 
     result = _safe_result(rule_result, enabled=True, notes="", provider=provider_name)
     for field in FIELD_NAMES:
         value = extracted.get(field)
         if isinstance(value, str) and value.strip():
             result[field] = value.strip()
+
+    # Internal telemetry only — not part of the public API response shape.
+    result["llm_model"] = model
+    result["llm_latency_ms"] = latency_ms
 
     return result
