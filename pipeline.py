@@ -6,7 +6,7 @@ from PIL import Image
 import config
 from address import normalize_extracted_fields, parse_address_from_lines
 from barcodes import extract_tracking_number, get_last_raw_barcodes
-from llm_extractor import extract_fields_with_llm
+from llm_extractor import extract_fields_with_llm, fallback_result
 from logger import log
 from models import EXTRACTION_FIELDS, ExtractionResult, FieldValue
 from ocr import get_best_ocr_text
@@ -147,18 +147,7 @@ def run(image_path, skip_llm=False):
     llm_mode = "none"
 
     def _skip_stub(notes):
-        return {
-            "recipient_name": label_data.get("recipient_name", ""),
-            "street_address": label_data.get("street_address", ""),
-            "city": label_data.get("city", ""),
-            "state": label_data.get("state", ""),
-            "zip_code": label_data.get("zip_code", ""),
-            "tracking_number": label_data.get("tracking_number", ""),
-            "carrier": label_data.get("carrier", ""),
-            "llm_enabled": False,
-            "llm_provider": "none",
-            "llm_notes": notes,
-        }
+        return fallback_result(label_data, enabled=False, notes=notes)
 
     if skip_llm:
         # Authoritative switch: no LLM call of any kind, even when the vision

@@ -160,13 +160,18 @@ def _detect_provider() -> dict[str, Any] | None:
     return None
 
 
-def _safe_result(
+def fallback_result(
     rule_result: dict[str, Any] | None,
     *,
     enabled: bool,
     notes: str,
     provider: str = "none",
 ) -> dict[str, Any]:
+    """Build an llm_result-shaped dict from rule-based values.
+
+    Used both here (LLM disabled/failed) and by pipeline.py (LLM skipped),
+    so the fallback shape is defined in exactly one place.
+    """
     rule_result = rule_result if isinstance(rule_result, dict) else {}
     result = {field: str(rule_result.get(field) or "").strip() for field in FIELD_NAMES}
     result.update({"llm_enabled": enabled, "llm_provider": provider, "llm_notes": notes})
@@ -186,7 +191,7 @@ def extract_fields_with_llm(
     """
     provider = _detect_provider()
     if not provider:
-        return _safe_result(
+        return fallback_result(
             rule_result,
             enabled=False,
             notes="LLM extraction disabled: set GROQ_API_KEY or OPENAI_API_KEY to enable.",
@@ -198,7 +203,7 @@ def extract_fields_with_llm(
 
     ocr_text = str(text or "").strip()
     if not ocr_text and not use_vision:
-        return _safe_result(
+        return fallback_result(
             rule_result,
             enabled=True,
             notes="LLM extraction skipped: OCR text is empty.",
@@ -244,7 +249,7 @@ def extract_fields_with_llm(
             "LLM API call failed (provider=%s model=%s mode=%s latency_ms=%d)",
             provider_name, model, mode, latency_ms,
         )
-        return _safe_result(
+        return fallback_result(
             rule_result,
             enabled=True,
             notes=f"{provider_name} API call failed; falling back to rule-based result.",
@@ -262,7 +267,7 @@ def extract_fields_with_llm(
             "LLM response was not valid JSON (provider=%s model=%s mode=%s latency_ms=%d)",
             provider_name, model, mode, latency_ms,
         )
-        return _safe_result(
+        return fallback_result(
             rule_result,
             enabled=True,
             notes=f"{provider_name} returned unparseable output; falling back to rule-based result.",
@@ -274,7 +279,7 @@ def extract_fields_with_llm(
         provider_name, model, mode, latency_ms,
     )
 
-    result = _safe_result(rule_result, enabled=True, notes="", provider=provider_name)
+    result = fallback_result(rule_result, enabled=True, notes="", provider=provider_name)
     for field in FIELD_NAMES:
         value = extracted.get(field)
         if isinstance(value, str) and value.strip():
