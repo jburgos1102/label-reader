@@ -340,17 +340,22 @@ def build_extraction_result(internal, label_id):
         ),
     }
 
-    # BUG 1 fix: cross-validate LLM values against OCR text so LLM-sourced fields
-    # get 0.85 (found in OCR) or 0.75 (plausible from image) instead of rule-based 0.0.
-    llm_scores = score_llm_result(llm_result, internal.get("_ocr_text", ""))
+    selections = internal.get("_selections") or {}
 
     def _fv(name):
-        rule_value = internal.get(name, "")
-        sel_value = internal.get("selected_result", {}).get(name, "")
-        raw = selected_sources.get(name, "rule_based")
-        # When the selection loop chose LLM (e.g. vision conflict override),
-        # prefer the selected LLM value; otherwise prefer the rule value.
-        value = (sel_value or rule_value) if raw == "llm" else (rule_value or sel_value)
+        selection = selections.get(name)
+        if selection is not None:
+            # Selection.value is exactly the legacy selected value: an "llm"
+            # selection is non-empty by construction, and any other selection
+            # is the rule value verbatim.
+            value = selection.value
+            raw = selection.source
+        else:
+            # Defensive fallback for an internal dict without selections
+            # (should not occur for run() output).
+            value = internal.get(name, "")
+            raw = selected_sources.get(name, "rule_based")
+
         conf = confidence.get(name, 0.0)
         if name == "carrier":
             # Carrier has no scored confidence of its own; it is inferred from
@@ -365,15 +370,18 @@ def build_extraction_result(internal, label_id):
             else:
                 source = "blank"
         elif name == "tracking_number":
+            # Tracking keeps the rule/checksum confidence even when the value
+            # was LLM-filled (legacy behavior, revisit with calibration).
             source = tracking_source
         else:
             if raw == "agreement":
                 source = "agreement"
             elif raw == "llm":
                 source = "llm"
-                llm_conf = llm_scores.get(name)
-                if llm_conf is not None:
-                    conf = llm_conf
+                if selection is not None:
+                    # LLM candidate confidence = score_llm_result cross-
+                    # validation (0.85 found in OCR / 0.75 plausible from image)
+                    conf = selection.confidence
             else:
                 source = "rule"
         return FieldValue(value=value, confidence=conf, source=source)
