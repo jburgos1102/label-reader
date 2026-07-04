@@ -132,22 +132,16 @@ def _validate_usps_checksum(tracking_number):
 
 
 def _validate_ups_checksum(tracking_number):
-    """Check-digit validation for UPS 1Z tracking numbers (1Z + 16 alphanumeric chars)."""
+    """Check-digit validation for UPS 1Z tracking numbers (1Z + 16 alphanumeric chars).
+
+    Returns None (not False) when the format is not a 1Z number, so
+    validate_tracking_checksum treats it as "not checksum-validated" rather
+    than a failed checksum. The check-digit math lives in
+    is_valid_ups_check_digit (this was previously a duplicate implementation).
+    """
     if not re.fullmatch(r"1Z[A-Z0-9]{16}", tracking_number):
         return None
-
-    check_char = tracking_number[-1]
-    if not check_char.isdigit():
-        return False
-
-    body = tracking_number[2:-1]  # 16 chars between 1Z and check digit
-    total = 0
-    for i, char in enumerate(body):
-        value = int(char) if char.isdigit() else ord(char) - 63  # A=2 … Z=27
-        multiplier = 1 if (i + 1) % 2 == 1 else 2               # odd pos ×1, even ×2
-        total += value * multiplier
-
-    return (10 - (total % 10)) % 10 == int(check_char)
+    return is_valid_ups_check_digit(tracking_number)
 
 
 def validate_tracking_checksum(tracking_number, carrier):
