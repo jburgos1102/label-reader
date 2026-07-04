@@ -34,6 +34,8 @@ class ExtractionResult:
     processing_ms: int = 0
     llm_mode: str = "none"
     ocr_rotations_tried: int = 4
+    # Additive telemetry rendered as metadata.llm; existing keys unchanged.
+    llm_telemetry: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -60,5 +62,6 @@ class ExtractionResult:
                 "processing_ms": self.processing_ms,
                 "llm_mode": self.llm_mode,
                 "ocr_rotations_tried": self.ocr_rotations_tried,
+                "llm": self.llm_telemetry,
             },
         }

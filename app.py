@@ -5,8 +5,9 @@ import uuid
 from flask import Flask, jsonify, render_template, request
 from werkzeug.utils import secure_filename
 
+import config
 from logger import log
-from pipeline import build_extraction_result, run
+from pipeline import LLM_POLICIES, build_extraction_result, run
 import storage
 
 app = Flask(__name__)
@@ -43,8 +44,8 @@ def _save_upload(uploaded_file):
     return path
 
 
-def _run_and_store(image_path, skip_llm=False, original_filename=None):
-    internal = run(image_path, skip_llm=skip_llm)
+def _run_and_store(image_path, llm_policy="auto", original_filename=None):
+    internal = run(image_path, llm_policy=llm_policy)
     label_id = str(uuid.uuid4())
     result = build_extraction_result(internal, label_id)
     try:
@@ -131,6 +132,22 @@ def api_scan():
     if secure_filename(uploaded_file.filename) == "":
         return jsonify({"error": "Invalid filename."}), 400
 
+    # LLM policy: strict "off" unless the caller explicitly requests a mode
+    # AND the server allows it (config.API_LLM_MODES_ALLOWED kill switch).
+    requested_mode = (
+        request.form.get("llm") or request.args.get("llm") or "off"
+    ).strip().lower()
+    if requested_mode not in LLM_POLICIES:
+        return (
+            jsonify({"error": f"llm must be one of: {', '.join(LLM_POLICIES)}."}),
+            400,
+        )
+    if requested_mode not in config.API_LLM_MODES_ALLOWED:
+        return (
+            jsonify({"error": f"llm mode '{requested_mode}' is not enabled on this server."}),
+            400,
+        )
+
     try:
         image_path = _save_upload(uploaded_file)
     except Exception:
@@ -138,7 +155,11 @@ def api_scan():
         return jsonify({"error": "Unable to save the image."}), 500
 
     try:
-        result = _run_and_store(image_path, skip_llm=True, original_filename=uploaded_file.filename)
+        result = _run_and_store(
+            image_path,
+            llm_policy=requested_mode,
+            original_filename=uploaded_file.filename,
+        )
     except Exception:
         log.exception("Unable to extract label data for /api/scan")
         return jsonify({"error": "Unable to process the image."}), 500

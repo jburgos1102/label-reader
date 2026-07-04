@@ -1,8 +1,8 @@
 from pipeline import run
 
 
-def extract_label_data(image_path):
-    return run(image_path)
+def extract_label_data(image_path, llm_policy=None):
+    return run(image_path, llm_policy=llm_policy)
 
 
 if __name__ == "__main__":

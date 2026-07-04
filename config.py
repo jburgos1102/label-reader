@@ -35,6 +35,12 @@ CAMERA_STABLE_SECONDS = 2.0
 CAMERA_HISTORY_FRAMES = 10
 CAMERA_HISTORY_THRESHOLD = 3
 
+# LLM modes /api/scan callers may request. Default is strict: only "off".
+# Widen to {"off", "auto", "force_vision"} to allow AI-assisted camera scans.
+# Kill switch matters because /api/scan is currently unauthenticated —
+# allowing "auto"/"force_vision" lets any caller trigger paid LLM calls.
+API_LLM_MODES_ALLOWED = {"off"}
+
 # Vision LLM trigger thresholds
 OCR_CONFIDENCE_VISION_THRESHOLD = 60   # Tesseract mean confidence (0–100); below → use vision
 OCR_TEXT_LENGTH_VISION_THRESHOLD = 50  # chars; shorter OCR output likely needs vision

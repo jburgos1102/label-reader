@@ -234,8 +234,12 @@ def main():
                                 f"{extraction_path}"
                             )
                             try:
+                                # Camera scans are deterministic-only by
+                                # default; pass llm_policy="auto" here to
+                                # opt in to AI assistance.
                                 extraction_result = extract_label_data(
-                                    str(extraction_path)
+                                    str(extraction_path),
+                                    llm_policy="off",
                                 )
                                 print("\n============================")
                                 print("Captured Label Extraction")

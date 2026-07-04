@@ -19,8 +19,39 @@ from tracking import (
 )
 
 
-def run(image_path, skip_llm=False):
-    """Full label extraction pipeline. Returns the internal result dict."""
+LLM_POLICIES = ("off", "auto", "force_vision")
+
+
+def _resolve_llm_policy(skip_llm, llm_policy):
+    """Normalize the legacy skip_llm flag and llm_policy into one policy.
+
+    skip_llm=True is a strict alias for llm_policy="off"; combining it with a
+    policy that allows LLM calls is a contradiction and raises rather than
+    silently picking a winner.
+    """
+    if llm_policy is not None and llm_policy not in LLM_POLICIES:
+        raise ValueError(
+            f"llm_policy must be one of {LLM_POLICIES}, got {llm_policy!r}"
+        )
+    if skip_llm and llm_policy in ("auto", "force_vision"):
+        raise ValueError(
+            f"skip_llm=True contradicts llm_policy={llm_policy!r}; "
+            "use llm_policy='off' (or drop skip_llm)"
+        )
+    if llm_policy is not None:
+        return llm_policy
+    return "off" if skip_llm else "auto"
+
+
+def run(image_path, skip_llm=False, llm_policy=None):
+    """Full label extraction pipeline. Returns the internal result dict.
+
+    llm_policy: "off" (no LLM call of any kind), "auto" (text LLM plus
+    vision when triggers fire — the historical default), or "force_vision"
+    (one vision call regardless of triggers). skip_llm=True is a strict
+    alias for "off".
+    """
+    llm_policy = _resolve_llm_policy(skip_llm, llm_policy)
     _start = time.monotonic()
 
     image = Image.open(image_path)
@@ -102,36 +133,33 @@ def run(image_path, skip_llm=False):
         _checksum_valid,
     )
 
-    # Determine whether the vision LLM should be used instead of the text LLM.
-    # skip_llm is authoritative: when set, neither mode runs (computed anyway
-    # so the trigger decision is still visible in debug logs).
+    # Vision-trigger evaluation. The reason names are telemetry: they are
+    # surfaced under metadata.llm.trigger_reasons. Computed for every policy
+    # (including "off") so the decision is always visible in logs/telemetry.
     _address_fields = ("city", "state", "street_address", "zip_code")
     _scored_conf = label_data.get("confidence", {})
     blank_address_fields = sum(
         1 for f in _address_fields
         if not label_data.get(f) or _scored_conf.get(f, 0.0) == 0.0
     )
-    street_rejected = label_data.get("_street_rejected", False)
-    name_looks_like_street = label_data.get("_name_looks_like_street", False)
-    name_is_sender_artifact = label_data.get("_name_is_sender_artifact", False)
-    name_single_word = label_data.get("_name_single_word", False)
-    name_looks_like_org = label_data.get("_name_looks_like_org", False)
-    use_vision = (
-        ocr_confidence < config.OCR_CONFIDENCE_VISION_THRESHOLD
-        or len(ocr_text.strip()) < config.OCR_TEXT_LENGTH_VISION_THRESHOLD
-        or blank_address_fields >= config.VISION_TRIGGER_BLANK_FIELDS
-        or street_rejected
-        or name_looks_like_street
-        or name_is_sender_artifact
-        or name_single_word
-        or name_looks_like_org
+    trigger_checks = (
+        ("ocr_confidence_low",
+         ocr_confidence < config.OCR_CONFIDENCE_VISION_THRESHOLD),
+        ("ocr_text_short",
+         len(ocr_text.strip()) < config.OCR_TEXT_LENGTH_VISION_THRESHOLD),
+        ("blank_address_fields",
+         blank_address_fields >= config.VISION_TRIGGER_BLANK_FIELDS),
+        ("street_rejected", label_data.get("_street_rejected", False)),
+        ("name_looks_like_street", label_data.get("_name_looks_like_street", False)),
+        ("name_is_sender_artifact", label_data.get("_name_is_sender_artifact", False)),
+        ("name_single_word", label_data.get("_name_single_word", False)),
+        ("name_looks_like_org", label_data.get("_name_looks_like_org", False)),
     )
+    trigger_reasons = [name for name, fired in trigger_checks if fired]
+    use_vision = bool(trigger_reasons)
     log.debug(
-        "Vision trigger: ocr_conf=%.1f text_len=%d blank_addr=%d street_rejected=%s "
-        "name_street=%s name_sender=%s name_single=%s name_org=%s use_vision=%s",
-        ocr_confidence, len(ocr_text.strip()), blank_address_fields, street_rejected,
-        name_looks_like_street, name_is_sender_artifact,
-        name_single_word, name_looks_like_org, use_vision,
+        "Vision trigger: policy=%s ocr_conf=%.1f text_len=%d reasons=%s",
+        llm_policy, ocr_confidence, len(ocr_text.strip()), trigger_reasons,
     )
 
     selected_fields = (
@@ -149,11 +177,11 @@ def run(image_path, skip_llm=False):
     def _skip_stub(notes):
         return fallback_result(label_data, enabled=False, notes=notes)
 
-    if skip_llm:
+    if llm_policy == "off":
         # Authoritative switch: no LLM call of any kind, even when the vision
-        # trigger fired (previously vision ran despite skip_llm).
-        llm_result = _skip_stub("LLM skipped for camera scan.")
-    elif use_vision:
+        # trigger fired.
+        llm_result = _skip_stub("LLM skipped by policy (off).")
+    elif llm_policy == "force_vision" or use_vision:
         try:
             llm_result = extract_fields_with_llm(ocr_text, label_data, image=image_bytes)
             llm_mode = "vision"
@@ -246,6 +274,8 @@ def run(image_path, skip_llm=False):
     label_data["_ocr_rotations_tried"] = ocr_rotations_tried
     label_data["_barcode_raw"] = barcode_raw
     label_data["_llm_mode"] = llm_mode
+    label_data["_llm_requested_mode"] = llm_policy
+    label_data["_llm_trigger_reasons"] = trigger_reasons
     label_data["_tracking_source"] = tracking_source
     label_data["_processing_ms"] = round((time.monotonic() - _start) * 1000)
 
@@ -279,6 +309,23 @@ def build_extraction_result(internal, label_id):
                 conflicts.append(field)
 
     tracking_confidence = confidence.get("tracking_number", 0.0)
+
+    # Additive telemetry (metadata.llm). "fields_from_llm" records where
+    # selection chose the LLM value — a change marker, not proof of
+    # improvement; improvement is computed offline against ground truth.
+    _llm_dict = llm_result if isinstance(llm_result, dict) else {}
+    llm_telemetry = {
+        "requested_mode": internal.get("_llm_requested_mode", "auto"),
+        "called": llm_called,
+        "mode": llm_mode,
+        "provider": _llm_dict.get("llm_provider", "none"),
+        "model": _llm_dict.get("llm_model", ""),
+        "latency_ms": _llm_dict.get("llm_latency_ms"),
+        "trigger_reasons": internal.get("_llm_trigger_reasons", []),
+        "fields_from_llm": sorted(
+            field for field, source in selected_sources.items() if source == "llm"
+        ),
+    }
 
     # BUG 1 fix: cross-validate LLM values against OCR text so LLM-sourced fields
     # get 0.85 (found in OCR) or 0.75 (plausible from image) instead of rule-based 0.0.
@@ -332,4 +379,5 @@ def build_extraction_result(internal, label_id):
         processing_ms=processing_ms,
         llm_mode=llm_mode,
         ocr_rotations_tried=ocr_rotations_tried,
+        llm_telemetry=llm_telemetry,
     )
