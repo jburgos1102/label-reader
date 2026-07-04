@@ -11,6 +11,7 @@ from logger import log
 from models import EXTRACTION_FIELDS, ExtractionResult, FieldValue
 from ocr import get_best_ocr_text
 from scoring import normalize_comparison_value, score_label_data, score_llm_result
+from selection import SelectionContext, Selector, llm_candidates, rule_candidates
 from tracking import (
     extract_tracking_from_ocr_lines,
     identify_carrier,
@@ -20,6 +21,10 @@ from tracking import (
 
 
 LLM_POLICIES = ("off", "auto", "force_vision")
+
+# Default selection policy (legacy-parity). Future calibrated policies are
+# alternate Selector implementations plugged in here.
+_selector = Selector()
 
 
 def _resolve_llm_policy(skip_llm, llm_policy):
@@ -221,36 +226,44 @@ def run(image_path, skip_llm=False, llm_policy=None):
     llm_available = isinstance(llm_result, dict) and bool(
         llm_result.get("llm_enabled")
     )
-    selected_result = {}
-    selected_sources = {}
 
+    # Candidate/Selector architecture: each source contributes Candidates and
+    # the Selector arbitrates one Selection per field. The policy is the
+    # legacy-parity Selector (selection.py); future sources (NER, additional
+    # OCR/LLM engines) plug in by appending candidates below.
+    llm_scores = score_llm_result(llm_result, ocr_text)
+    rule_cands = rule_candidates(
+        label_data,
+        selected_fields,
+        label_data.get("confidence", {}),
+        tracking_checksum_valid=_checksum_valid,
+    )
+    llm_cands = llm_candidates(llm_result, selected_fields, llm_scores)
+    selection_context = SelectionContext(llm_mode=llm_mode)
+
+    selections = {}
     for field in selected_fields:
-        rule_based_value = label_data.get(field, "")
-        openai_value = llm_result.get(field, "") if llm_available else ""
-        values_agree = llm_available and normalize_comparison_value(
-            rule_based_value
-        ) == normalize_comparison_value(openai_value)
+        field_candidates = [rule_cands[field]]
+        if field in llm_cands:
+            field_candidates.append(llm_cands[field])
+        selections[field] = _selector.select(
+            field, field_candidates, selection_context
+        )
+        log.debug(
+            "Selection %s: value=%r source=%s reason=%s",
+            field,
+            selections[field].value,
+            selections[field].source,
+            selections[field].reason,
+        )
 
-        if not rule_based_value and llm_available and openai_value:
-            # Rule produced nothing; LLM fills the gap.
-            selected_result[field] = openai_value
-            selected_sources[field] = "llm"
-        elif (
-            llm_mode == "vision"
-            and llm_available
-            and openai_value
-            and not values_agree
-        ):
-            # Vision was triggered because rule-based extraction is unreliable;
-            # defer to LLM on any conflict rather than letting rule win.
-            selected_result[field] = openai_value
-            selected_sources[field] = "llm"
-        else:
-            selected_result[field] = rule_based_value
-            selected_sources[field] = "agreement" if values_agree else "rule_based"
+    selected_result = {field: s.value for field, s in selections.items()}
+    selected_sources = {field: s.source for field, s in selections.items()}
 
     selected_result["source"] = selected_sources
     label_data["selected_result"] = selected_result
+    label_data["_selections"] = selections
+    label_data["_llm_scores"] = llm_scores
 
     comparison = {}
 
