@@ -293,6 +293,11 @@ def build_extraction_result(internal, label_id):
         value = (sel_value or rule_value) if raw == "llm" else (rule_value or sel_value)
         conf = confidence.get(name, 0.0)
         if name == "carrier":
+            # Carrier has no scored confidence of its own; it is inferred from
+            # the tracking number, so it inherits tracking confidence. This
+            # under-reports carrier confidence when carrier came from OCR
+            # context with no tracking number (conf stays 0.0 even when the
+            # carrier is right) — revisit with calibrated confidence.
             conf = tracking_confidence
         if not value:
             if name == "street_address" and internal.get("_street_rejected"):
