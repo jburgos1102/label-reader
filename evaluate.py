@@ -37,6 +37,7 @@ from comparators import (  # noqa: E402,F401  (re-exported)
     normalize_street_address,
     normalize_value,
 )
+from calibration import load_table as load_calibration_table  # noqa: E402
 
 def find_image_for_expected(expected_path):
     carrier_dir = expected_path.parent.parent
@@ -97,6 +98,26 @@ def main():
         )
 
     print(f"\nAnnotated labels evaluated: {n}")
+
+    # Staleness check: warn when the annotation set has grown well past what
+    # the committed calibration table was fitted on.
+    calibration_table = load_calibration_table()
+    if calibration_table:
+        fitted_on = calibration_table.get("metadata", {}).get("annotated_labels") or 0
+        seen_tn: set[str] = set()
+        deduped_n = 0
+        for label in labels:
+            tn = label.get("tracking_number") or ""
+            if tn and tn in seen_tn:
+                continue
+            if tn:
+                seen_tn.add(tn)
+            deduped_n += 1
+        if fitted_on and deduped_n > fitted_on * 1.25:
+            print(
+                f"Note: calibration table was fitted on {fitted_on} labels; "
+                f"the DB now has {deduped_n} (deduped) — re-run fit_calibration.py"
+            )
 
     field_correct = {f: 0 for f in FIELDS_TO_COMPARE}
     field_strict_correct = {f: 0 for f in FIELDS_TO_COMPARE}
