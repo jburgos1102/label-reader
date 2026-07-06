@@ -115,6 +115,20 @@
             font-weight: 600;
         }
 
+        /* ── AI Vision Assist toggle ── */
+        .ai-assist-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 10px 0 2px;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+        .ai-assist-row .ai-assist-hint {
+            color: #777;
+            font-size: 0.85rem;
+        }
+
         /* ── Camera button row ── */
         .camera-btn-row {
             display: flex;
@@ -296,6 +310,12 @@
                     <p id="barcode-status" class="barcode-status"></p>
                     <p id="camera-status" class="camera-status"></p>
 
+                    <label class="ai-assist-row">
+                        <input type="checkbox" id="ai-vision-assist">
+                        AI Vision Assist
+                        <span class="ai-assist-hint">(unchecked = Fast Mode, no AI)</span>
+                    </label>
+
                     <div class="camera-btn-row">
                         <button type="button" id="capture-btn" disabled>Capture &amp; Scan</button>
                         <button type="button" id="toggle-camera-btn" class="secondary">Start Camera</button>
@@ -435,6 +455,10 @@
         function postImage(blob, filename) {
             var fd = new FormData();
             fd.append('label_image', blob, filename);
+            // AI Vision Assist: unchecked = Fast Mode (llm=off, deterministic
+            // only); checked = one vision LLM pass (llm=force_vision).
+            var aiAssist = document.getElementById('ai-vision-assist');
+            fd.append('llm', aiAssist && aiAssist.checked ? 'force_vision' : 'off');
             return fetch('/api/scan', { method: 'POST', body: fd })
                 .then(function (resp) {
                     return resp.json().then(function (body) {
