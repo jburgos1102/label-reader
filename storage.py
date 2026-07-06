@@ -57,7 +57,26 @@ _MIGRATED_COLUMNS = {
     "ocr_rotations": "INTEGER",
     "barcode_raw": "TEXT",
     "corrections": "TEXT",
+    # Selection provenance (added for confidence calibration). JSON columns:
+    # selection_reasons {field: reason}, candidates {field: [candidate dicts]},
+    # llm_trigger_reasons [reason, ...].
+    "parser_used": "TEXT",
+    "selection_reasons": "TEXT",
+    "candidates": "TEXT",
+    "llm_requested_mode": "TEXT",
+    "llm_model": "TEXT",
+    "llm_latency_ms": "INTEGER",
+    "llm_trigger_reasons": "TEXT",
 }
+
+# JSON-encoded columns parsed back into Python objects by the readers.
+_JSON_COLUMNS = (
+    "ground_truth",
+    "corrections",
+    "selection_reasons",
+    "candidates",
+    "llm_trigger_reasons",
+)
 
 _INSERT = """
 INSERT OR REPLACE INTO labels (
@@ -70,7 +89,10 @@ INSERT OR REPLACE INTO labels (
     zip_code,         zip_code_confidence,         zip_code_source,
     tracking_number,  tracking_number_confidence,  tracking_number_source,
     carrier,          carrier_confidence,          carrier_source,
-    llm_called, processing_ms, ground_truth
+    llm_called, processing_ms,
+    parser_used, selection_reasons, candidates,
+    llm_requested_mode, llm_model, llm_latency_ms, llm_trigger_reasons,
+    ground_truth
 ) VALUES (
     ?, ?, ?, ?, ?,
     ?, ?, ?,
@@ -81,7 +103,10 @@ INSERT OR REPLACE INTO labels (
     ?, ?, ?,
     ?, ?, ?,
     ?, ?, ?,
-    ?, ?, NULL
+    ?, ?,
+    ?, ?, ?,
+    ?, ?, ?, ?,
+    NULL
 )
 """
 
@@ -113,6 +138,13 @@ def store(
     barcode_raw="",
     ocr_confidence=None,
     ocr_rotations=None,
+    parser_used=None,
+    selection_reasons=None,
+    candidates=None,
+    llm_requested_mode=None,
+    llm_model=None,
+    llm_latency_ms=None,
+    llm_trigger_reasons=None,
 ):
     """Persist an ExtractionResult row and return its label_id.
 
@@ -162,6 +194,13 @@ def store(
                 _v("carrier"),         _c("carrier"),         _s("carrier"),
                 1 if meta["llm_called"] else 0,
                 meta["processing_ms"],
+                parser_used,
+                json.dumps(selection_reasons) if selection_reasons is not None else None,
+                json.dumps(candidates) if candidates is not None else None,
+                llm_requested_mode,
+                llm_model,
+                llm_latency_ms,
+                json.dumps(llm_trigger_reasons) if llm_trigger_reasons is not None else None,
             ],
         )
 
@@ -180,7 +219,7 @@ def get_label(label_id):
         return None
 
     data = dict(row)
-    for json_field in ("ground_truth", "corrections"):
+    for json_field in _JSON_COLUMNS:
         raw = data.get(json_field)
         data[json_field] = json.loads(raw) if raw else None
 
@@ -199,7 +238,7 @@ def get_annotated_labels():
     result = []
     for row in rows:
         data = dict(row)
-        for json_field in ("ground_truth", "corrections"):
+        for json_field in _JSON_COLUMNS:
             raw = data.get(json_field)
             data[json_field] = json.loads(raw) if raw else None
         result.append(data)

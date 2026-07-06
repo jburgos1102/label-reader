@@ -20,7 +20,7 @@ selection rules exactly (guarded by tests/test_selection_parity.py). Smarter,
 calibrated policies come later and slot in behind the same interface.
 """
 
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import asdict, dataclass, field as dataclass_field
 
 import config
 from scoring import normalize_comparison_value
@@ -128,6 +128,18 @@ class Selector:
 # ---------------------------------------------------------------------------
 # Candidate builders for the existing sources
 # ---------------------------------------------------------------------------
+
+
+def selection_provenance(selections):
+    """JSON-serializable provenance for storage: per-field selection reasons
+    and the full candidate lists (including the losers — needed later to
+    calibrate candidate accuracy, not just selected-value accuracy)."""
+    reasons = {name: s.reason for name, s in selections.items()}
+    candidates = {
+        name: [asdict(c) for c in s.candidates]
+        for name, s in selections.items()
+    }
+    return reasons, candidates
 
 
 def rule_candidates(label_data, fields, confidence, tracking_checksum_valid=None):

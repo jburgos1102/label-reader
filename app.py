@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 import config
 from logger import log
 from pipeline import LLM_POLICIES, build_extraction_result, run
+from selection import selection_provenance
 import storage
 
 app = Flask(__name__)
@@ -51,6 +52,10 @@ def _run_and_store(image_path, llm_policy="auto", original_filename=None):
     try:
         with open(image_path, "rb") as f:
             image_bytes = f.read()
+        selection_reasons, candidates = selection_provenance(
+            internal.get("_selections") or {}
+        )
+        telemetry = result.llm_telemetry or {}
         storage.store(
             result,
             ocr_text=internal.get("_ocr_text", ""),
@@ -59,6 +64,13 @@ def _run_and_store(image_path, llm_policy="auto", original_filename=None):
             barcode_raw=internal.get("_barcode_raw", ""),
             ocr_confidence=internal.get("_ocr_confidence"),
             ocr_rotations=internal.get("_ocr_rotations_tried"),
+            parser_used=internal.get("parser_used", "") or "",
+            selection_reasons=selection_reasons,
+            candidates=candidates,
+            llm_requested_mode=telemetry.get("requested_mode"),
+            llm_model=telemetry.get("model"),
+            llm_latency_ms=telemetry.get("latency_ms"),
+            llm_trigger_reasons=telemetry.get("trigger_reasons"),
         )
     except Exception:
         log.warning("Failed to persist label %s to storage", label_id)
