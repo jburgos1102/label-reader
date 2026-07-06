@@ -71,3 +71,62 @@ def lookup(table, field, source, validations=None, min_n=None):
         if bucket and bucket["n"] >= min_n:
             return bucket["p"], key
     return None, None
+
+
+# ---------------------------------------------------------------------------
+# Confidence models — the seam candidate builders route confidence through.
+# config.CONFIDENCE_MODE selects the model; "legacy" (the default) is a pure
+# passthrough, so runtime behavior is unchanged until the flip is approved.
+# ---------------------------------------------------------------------------
+
+
+class LegacyConfidence:
+    """Passthrough: candidates keep the historical heuristic confidence."""
+
+    name = "legacy"
+
+    def candidate_confidence(self, field, source, base_confidence, validations=None):
+        return base_confidence
+
+
+class CalibratedConfidence:
+    """Measured P(correct) from the fitted table, hierarchical fallback.
+
+    Falls back to the caller's legacy value when no bucket has enough
+    samples (or no artifact exists), so enabling this model can never
+    produce a field with no confidence at all.
+    """
+
+    name = "calibrated"
+
+    def __init__(self, table=None, path=None):
+        self._table = table if table is not None else load_table(path)
+
+    def candidate_confidence(self, field, source, base_confidence, validations=None):
+        probability, _ = lookup(self._table, field, source, validations)
+        return probability if probability is not None else base_confidence
+
+
+_model_cache = {}
+
+
+def get_confidence_model():
+    """Model selected by config.CONFIDENCE_MODE ("legacy" | "calibrated")."""
+    import config  # late import: config must stay dependency-free
+
+    mode = getattr(config, "CONFIDENCE_MODE", "legacy")
+    model = _model_cache.get(mode)
+    if model is None:
+        if mode == "calibrated":
+            model = CalibratedConfidence()
+        elif mode == "legacy":
+            model = LegacyConfidence()
+        else:
+            raise ValueError(f"CONFIDENCE_MODE must be 'legacy' or 'calibrated', got {mode!r}")
+        _model_cache[mode] = model
+    return model
+
+
+def reset_confidence_model():
+    """Drop cached models (tests / after config or artifact changes)."""
+    _model_cache.clear()

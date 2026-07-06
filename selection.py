@@ -23,6 +23,7 @@ calibrated policies come later and slot in behind the same interface.
 from dataclasses import asdict, dataclass, field as dataclass_field
 
 import config
+from calibration import get_confidence_model
 from scoring import normalize_comparison_value
 
 
@@ -143,7 +144,13 @@ def selection_provenance(selections):
 
 
 def rule_candidates(label_data, fields, confidence, tracking_checksum_valid=None):
-    """Build one rule-engine candidate per field from the scored label_data."""
+    """Build one rule-engine candidate per field from the scored label_data.
+
+    Confidence routes through the configured ConfidenceModel: "legacy"
+    (default) passes the heuristic value through unchanged; "calibrated"
+    replaces it with measured P(correct) from the fitted table.
+    """
+    model = get_confidence_model()
     candidates = {}
     for field_name in fields:
         validations = {}
@@ -155,7 +162,9 @@ def rule_candidates(label_data, fields, confidence, tracking_checksum_valid=None
             field=field_name,
             value=label_data.get(field_name, ""),
             source="rule",
-            confidence=confidence.get(field_name, 0.0),
+            confidence=model.candidate_confidence(
+                field_name, "rule", confidence.get(field_name, 0.0), validations
+            ),
             validations=validations,
             reason=label_data.get("parser_used", "") or "",
         )
@@ -171,18 +180,22 @@ def llm_candidates(llm_result, fields, llm_scores):
     if not isinstance(llm_result, dict) or not llm_result.get("llm_enabled"):
         return {}
 
+    model = get_confidence_model()
     candidates = {}
     for field_name in fields:
         score = llm_scores.get(field_name)
         confidence = score if score is not None else 0.0
+        validations = {
+            "found_in_ocr": confidence == config.CONFIDENCE_LLM_OCR_MATCH,
+        }
         candidates[field_name] = Candidate(
             field=field_name,
             value=llm_result.get(field_name, ""),
             source="llm",
-            confidence=confidence,
-            validations={
-                "found_in_ocr": confidence == config.CONFIDENCE_LLM_OCR_MATCH,
-            },
+            confidence=model.candidate_confidence(
+                field_name, "llm", confidence, validations
+            ),
+            validations=validations,
             reason=llm_result.get("llm_provider", "") or "",
         )
     return candidates
