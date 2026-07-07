@@ -11,7 +11,13 @@ from logger import log
 from models import EXTRACTION_FIELDS, ExtractionResult, FieldValue
 from ocr import get_best_ocr_text
 from scoring import normalize_comparison_value, score_label_data, score_llm_result
-from selection import SelectionContext, Selector, llm_candidates, rule_candidates
+from selection import (
+    SelectionContext,
+    Selector,
+    llm_candidates,
+    ner_candidates,
+    rule_candidates,
+)
 from tracking import (
     extract_tracking_from_ocr_lines,
     identify_carrier,
@@ -239,6 +245,23 @@ def run(image_path, skip_llm=False, llm_policy=None):
         tracking_checksum_valid=_checksum_valid,
     )
     llm_cands = llm_candidates(llm_result, selected_fields, llm_scores)
+
+    # NER shadow source (config.NER_ENABLED, default off): candidates are
+    # persisted for measurement only — the legacy Selector ignores
+    # source="ner", so selected output cannot change. The import stays
+    # inside the flag so a disabled deployment never touches onnxruntime.
+    ner_cands = {}
+    if config.NER_ENABLED:
+        from ner_extractor import get_extractor, ner_field_predictions
+
+        predictions = ner_field_predictions(ocr_text)
+        if predictions:
+            extractor = get_extractor()
+            version = f"ner:{extractor.version}" if extractor else "ner"
+            ner_cands = ner_candidates(
+                predictions, selected_fields, model_version=version
+            )
+
     selection_context = SelectionContext(llm_mode=llm_mode)
 
     selections = {}
@@ -246,6 +269,8 @@ def run(image_path, skip_llm=False, llm_policy=None):
         field_candidates = [rule_cands[field]]
         if field in llm_cands:
             field_candidates.append(llm_cands[field])
+        if field in ner_cands:
+            field_candidates.append(ner_cands[field])
         selections[field] = _selector.select(
             field, field_candidates, selection_context
         )

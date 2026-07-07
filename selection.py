@@ -20,11 +20,13 @@ selection rules exactly (guarded by tests/test_selection_parity.py). Smarter,
 calibrated policies come later and slot in behind the same interface.
 """
 
+import re
 from dataclasses import asdict, dataclass, field as dataclass_field
 
 import config
 from calibration import get_confidence_model
 from scoring import normalize_comparison_value
+from tracking import identify_carrier, validate_tracking_checksum
 
 
 @dataclass
@@ -197,5 +199,53 @@ def llm_candidates(llm_result, fields, llm_scores):
             ),
             validations=validations,
             reason=llm_result.get("llm_provider", "") or "",
+        )
+    return candidates
+
+
+def _ner_validations(field_name, value):
+    """Cheap format/checksum validations for an NER prediction — recorded on
+    the candidate as future calibration features."""
+    validations = {}
+    if field_name == "state":
+        validations["format_valid"] = bool(re.fullmatch(r"[A-Z]{2}", value))
+    elif field_name == "zip_code":
+        validations["format_valid"] = bool(re.fullmatch(r"\d{5}(-\d{4})?", value))
+    elif field_name == "tracking_number":
+        validations["checksum_valid"] = validate_tracking_checksum(
+            value, identify_carrier(value)
+        )
+    return validations
+
+
+def ner_candidates(ner_predictions, fields, model_version="ner"):
+    """Build shadow candidates from NER predictions.
+
+    The legacy Selector IGNORES source="ner" candidates — they exist to be
+    persisted and measured, not to influence selection. Confidence is the
+    model's uncalibrated span probability, routed through the configured
+    ConfidenceModel like every other source (the calibrated table has no
+    ner buckets yet, so it passes through unchanged). Fields where the
+    model found nothing emit no candidate.
+    """
+    model = get_confidence_model()
+    candidates = {}
+    for field_name in fields:
+        prediction = ner_predictions.get(field_name)
+        if not prediction or not prediction.get("value"):
+            continue
+        validations = _ner_validations(field_name, prediction["value"])
+        # Non-boolean entry: excluded from calibration signatures, kept for
+        # offline analysis (how often the model saw competing spans).
+        validations["alternates"] = prediction.get("alternates", 0)
+        candidates[field_name] = Candidate(
+            field=field_name,
+            value=prediction["value"],
+            source="ner",
+            confidence=model.candidate_confidence(
+                field_name, "ner", prediction.get("confidence", 0.0), validations
+            ),
+            validations=validations,
+            reason=model_version,
         )
     return candidates
