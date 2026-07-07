@@ -8,6 +8,14 @@ GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_TIMEOUT = 30.0
 
+# Confidence model for candidate confidence values.
+#   "legacy"     — historical heuristic constants (current behavior)
+#   "calibrated" — measured P(correct) from calibration/confidence_table.json
+# Flipping to "calibrated" changes reported confidence values (not selected
+# values/sources) and requires regenerating the golden parity file — do not
+# flip without review.
+CONFIDENCE_MODE = "legacy"
+
 # Rule-based per-field confidence values
 TRACKING_MIN_LENGTH = 15
 CONFIDENCE_TRACKING_HIGH = 0.95

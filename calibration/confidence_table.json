@@ -1,0 +1,420 @@
+{
+  "buckets": {
+    "agreement": {
+      "accuracy": 0.9067,
+      "correct": 379,
+      "n": 418,
+      "p": 0.9048,
+      "usable": true,
+      "wilson_95": [
+        0.875,
+        0.931
+      ]
+    },
+    "barcode": {
+      "accuracy": 1.0,
+      "correct": 131,
+      "n": 131,
+      "p": 0.9925,
+      "usable": true,
+      "wilson_95": [
+        0.9715,
+        1.0
+      ]
+    },
+    "blank": {
+      "accuracy": 0.2857,
+      "correct": 2,
+      "n": 7,
+      "p": 0.3333,
+      "usable": false,
+      "wilson_95": [
+        0.0822,
+        0.6411
+      ]
+    },
+    "carrier|agreement": {
+      "accuracy": 1.0,
+      "correct": 89,
+      "n": 89,
+      "p": 0.989,
+      "usable": true,
+      "wilson_95": [
+        0.9586,
+        1.0
+      ]
+    },
+    "carrier|llm": {
+      "accuracy": 1.0,
+      "correct": 1,
+      "n": 1,
+      "p": 0.6667,
+      "usable": false,
+      "wilson_95": [
+        0.2065,
+        1.0
+      ]
+    },
+    "carrier|llm|found_in_ocr=False": {
+      "accuracy": 1.0,
+      "correct": 1,
+      "n": 1,
+      "p": 0.6667,
+      "usable": false,
+      "wilson_95": [
+        0.2065,
+        1.0
+      ]
+    },
+    "carrier|rule": {
+      "accuracy": 1.0,
+      "correct": 45,
+      "n": 45,
+      "p": 0.9787,
+      "usable": true,
+      "wilson_95": [
+        0.9213,
+        1.0
+      ]
+    },
+    "city|agreement": {
+      "accuracy": 1.0,
+      "correct": 87,
+      "n": 87,
+      "p": 0.9888,
+      "usable": true,
+      "wilson_95": [
+        0.9577,
+        1.0
+      ]
+    },
+    "city|llm": {
+      "accuracy": 0.3333,
+      "correct": 1,
+      "n": 3,
+      "p": 0.4,
+      "usable": false,
+      "wilson_95": [
+        0.0615,
+        0.7923
+      ]
+    },
+    "city|llm|found_in_ocr=False": {
+      "accuracy": 1.0,
+      "correct": 1,
+      "n": 1,
+      "p": 0.6667,
+      "usable": false,
+      "wilson_95": [
+        0.2065,
+        1.0
+      ]
+    },
+    "city|llm|found_in_ocr=True": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "n": 2,
+      "p": 0.25,
+      "usable": false,
+      "wilson_95": [
+        0.0,
+        0.6576
+      ]
+    },
+    "city|rule": {
+      "accuracy": 0.9111,
+      "correct": 41,
+      "n": 45,
+      "p": 0.8936,
+      "usable": true,
+      "wilson_95": [
+        0.7927,
+        0.9649
+      ]
+    },
+    "llm": {
+      "accuracy": 0.9496,
+      "correct": 113,
+      "n": 119,
+      "p": 0.9421,
+      "usable": true,
+      "wilson_95": [
+        0.8944,
+        0.9767
+      ]
+    },
+    "recipient_name|agreement": {
+      "accuracy": 0.04,
+      "correct": 1,
+      "n": 25,
+      "p": 0.0741,
+      "usable": true,
+      "wilson_95": [
+        0.0071,
+        0.1954
+      ]
+    },
+    "recipient_name|blank": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "n": 2,
+      "p": 0.25,
+      "usable": false,
+      "wilson_95": [
+        0.0,
+        0.6576
+      ]
+    },
+    "recipient_name|llm": {
+      "accuracy": 0.9538,
+      "correct": 62,
+      "n": 65,
+      "p": 0.9403,
+      "usable": true,
+      "wilson_95": [
+        0.8729,
+        0.9842
+      ]
+    },
+    "recipient_name|llm|found_in_ocr=True": {
+      "accuracy": 0.9538,
+      "correct": 62,
+      "n": 65,
+      "p": 0.9403,
+      "usable": true,
+      "wilson_95": [
+        0.8729,
+        0.9842
+      ]
+    },
+    "recipient_name|rule": {
+      "accuracy": 0.3023,
+      "correct": 13,
+      "n": 43,
+      "p": 0.3111,
+      "usable": true,
+      "wilson_95": [
+        0.186,
+        0.4511
+      ]
+    },
+    "rule": {
+      "accuracy": 0.8083,
+      "correct": 215,
+      "n": 266,
+      "p": 0.806,
+      "usable": true,
+      "wilson_95": [
+        0.7567,
+        0.8511
+      ]
+    },
+    "state|agreement": {
+      "accuracy": 1.0,
+      "correct": 88,
+      "n": 88,
+      "p": 0.9889,
+      "usable": true,
+      "wilson_95": [
+        0.9582,
+        1.0
+      ]
+    },
+    "state|blank": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "n": 1,
+      "p": 0.3333,
+      "usable": false,
+      "wilson_95": [
+        0.0,
+        0.7935
+      ]
+    },
+    "state|llm": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "n": 1,
+      "p": 0.3333,
+      "usable": false,
+      "wilson_95": [
+        0.0,
+        0.7935
+      ]
+    },
+    "state|llm|found_in_ocr=True": {
+      "accuracy": 0.0,
+      "correct": 0,
+      "n": 1,
+      "p": 0.3333,
+      "usable": false,
+      "wilson_95": [
+        0.0,
+        0.7935
+      ]
+    },
+    "state|rule": {
+      "accuracy": 0.9111,
+      "correct": 41,
+      "n": 45,
+      "p": 0.8936,
+      "usable": true,
+      "wilson_95": [
+        0.7927,
+        0.9649
+      ]
+    },
+    "street_address|agreement": {
+      "accuracy": 0.6341,
+      "correct": 26,
+      "n": 41,
+      "p": 0.6279,
+      "usable": true,
+      "wilson_95": [
+        0.4812,
+        0.7641
+      ]
+    },
+    "street_address|llm": {
+      "accuracy": 1.0,
+      "correct": 47,
+      "n": 47,
+      "p": 0.9796,
+      "usable": true,
+      "wilson_95": [
+        0.9244,
+        1.0
+      ]
+    },
+    "street_address|llm|found_in_ocr=False": {
+      "accuracy": 1.0,
+      "correct": 5,
+      "n": 5,
+      "p": 0.8571,
+      "usable": false,
+      "wilson_95": [
+        0.5655,
+        1.0
+      ]
+    },
+    "street_address|llm|found_in_ocr=True": {
+      "accuracy": 1.0,
+      "correct": 42,
+      "n": 42,
+      "p": 0.9773,
+      "usable": true,
+      "wilson_95": [
+        0.9162,
+        1.0
+      ]
+    },
+    "street_address|rule": {
+      "accuracy": 0.7907,
+      "correct": 34,
+      "n": 43,
+      "p": 0.7778,
+      "usable": true,
+      "wilson_95": [
+        0.6479,
+        0.8858
+      ]
+    },
+    "tracking_number|barcode": {
+      "accuracy": 1.0,
+      "correct": 131,
+      "n": 131,
+      "p": 0.9925,
+      "usable": true,
+      "wilson_95": [
+        0.9715,
+        1.0
+      ]
+    },
+    "tracking_number|barcode|checksum_valid=True": {
+      "accuracy": 1.0,
+      "correct": 10,
+      "n": 10,
+      "p": 0.9167,
+      "usable": false,
+      "wilson_95": [
+        0.7225,
+        1.0
+      ]
+    },
+    "tracking_number|blank": {
+      "accuracy": 0.5,
+      "correct": 2,
+      "n": 4,
+      "p": 0.5,
+      "usable": false,
+      "wilson_95": [
+        0.15,
+        0.85
+      ]
+    },
+    "zip_code|agreement": {
+      "accuracy": 1.0,
+      "correct": 88,
+      "n": 88,
+      "p": 0.9889,
+      "usable": true,
+      "wilson_95": [
+        0.9582,
+        1.0
+      ]
+    },
+    "zip_code|llm": {
+      "accuracy": 1.0,
+      "correct": 2,
+      "n": 2,
+      "p": 0.75,
+      "usable": false,
+      "wilson_95": [
+        0.3424,
+        1.0
+      ]
+    },
+    "zip_code|llm|found_in_ocr=False": {
+      "accuracy": 1.0,
+      "correct": 1,
+      "n": 1,
+      "p": 0.6667,
+      "usable": false,
+      "wilson_95": [
+        0.2065,
+        1.0
+      ]
+    },
+    "zip_code|llm|found_in_ocr=True": {
+      "accuracy": 1.0,
+      "correct": 1,
+      "n": 1,
+      "p": 0.6667,
+      "usable": false,
+      "wilson_95": [
+        0.2065,
+        1.0
+      ]
+    },
+    "zip_code|rule": {
+      "accuracy": 0.9111,
+      "correct": 41,
+      "n": 45,
+      "p": 0.8936,
+      "usable": true,
+      "wilson_95": [
+        0.7927,
+        0.9649
+      ]
+    }
+  },
+  "metadata": {
+    "annotated_labels": 158,
+    "correctness_definition": "comparators.compare_field (shared fuzzy comparators)",
+    "dedupe": "latest scan per tracking number",
+    "excluded": "source='dataset' fields; empty ground truth",
+    "fitted_at": "2026-07-06T18:24:26.630159+00:00",
+    "min_bucket_n": 25,
+    "samples": 941
+  }
+}
