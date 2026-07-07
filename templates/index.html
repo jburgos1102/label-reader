@@ -115,6 +115,14 @@
             font-weight: 600;
         }
 
+        /* ── Results header (title + Clear Screen) ── */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
         /* ── AI Vision Assist toggle ── */
         .ai-assist-row {
             display: flex;
@@ -334,7 +342,10 @@
 
             <!-- ── RIGHT: results ── -->
             <section class="panel results-panel" aria-labelledby="results-title">
-                <h2 id="results-title">Results</h2>
+                <div class="results-header">
+                    <h2 id="results-title">Results</h2>
+                    <button type="button" id="clear-screen-btn" class="secondary">Clear Screen</button>
+                </div>
                 <p id="results-placeholder" class="helper-text">
                     Capture a label or upload an image to see results here.
                 </p>
@@ -450,6 +461,28 @@
             currentLabelId = null;
             annotatePanel.hidden = true;
         }
+
+        /* ── Clear Screen: reset scan state without reloading or touching
+              the camera stream / AI Vision Assist checkbox ── */
+        function clearScreen() {
+            fileInput.value = '';
+            outputEl.textContent = '';
+            outputEl.hidden = true;
+            errEl.textContent = '';
+            errEl.hidden = true;
+            placeholder.hidden = false;
+            currentLabelId = null;
+            annotatePanel.hidden = true;
+            Object.keys(_annotateInputs).forEach(function (field) {
+                _annotateInputs[field].value = '';
+            });
+            annotateStatus.textContent = '';
+            annotateStatus.className = 'annotate-status';
+            statusEl.textContent = cameraActive ? 'Camera ready' : '';
+        }
+
+        document.getElementById('clear-screen-btn')
+            .addEventListener('click', clearScreen);
 
         /* ── POST image to /api/scan ── */
         function postImage(blob, filename) {
