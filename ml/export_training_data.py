@@ -24,7 +24,13 @@ import argparse
 import json
 import re
 import sqlite3
+import sys
 from pathlib import Path
+
+# Tokenization is shared with runtime inference (ner_decode.py at the project
+# root) so training data and inference can never tokenize differently.
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from ner_decode import FIELD_TO_ENTITY, tokenize  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -34,15 +40,7 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent.parent / "label_storage.db"
 OUTPUT_DIR = Path(__file__).parent / "training_data"
 
-FIELD_TO_ENTITY = {
-    "recipient_name":  "NAME",
-    "street_address":  "STREET",
-    "city":            "CITY",
-    "state":           "STATE",
-    "zip_code":        "ZIP",
-    "tracking_number": "TRACKING",
-    "carrier":         "CARRIER",
-}
+# FIELD_TO_ENTITY imported from ner_decode (shared with runtime inference).
 
 # Fields where an I- continuation tag exists
 HAS_CONTINUATION = {"NAME", "STREET", "CITY", "TRACKING"}
@@ -71,18 +69,6 @@ def load_annotated_labels(db_path: Path) -> list[dict]:
             seen[tn] = dict(row)
 
     return list(seen.values())
-
-
-# ---------------------------------------------------------------------------
-# Tokenizer (word-level, preserving punctuation as separate tokens)
-# ---------------------------------------------------------------------------
-
-_TOKEN_RE = re.compile(r"[A-Za-z0-9#&'.-]+|[^\w\s]")
-
-
-def tokenize(text: str) -> list[str]:
-    """Split OCR text into word-level tokens."""
-    return _TOKEN_RE.findall(text)
 
 
 # ---------------------------------------------------------------------------
