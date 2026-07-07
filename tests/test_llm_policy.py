@@ -157,8 +157,10 @@ def api_tests(image_path):
         assert body["metadata"]["llm"]["requested_mode"] == "off"
         assert body["metadata"]["llm"]["called"] is False
 
-        # valid but not allowed by config (default allowlist is {"off"}): 400
-        assert config.API_LLM_MODES_ALLOWED == {"off"}
+        # valid but not allowed by the kill switch: 400. Set the allowlist
+        # explicitly — the config default is deployment-dependent (it was
+        # widened for the demo) and this test is about the 400 behavior.
+        config.API_LLM_MODES_ALLOWED = {"off"}
         r = post(llm="auto")
         assert r.status_code == 400 and b"not enabled" in r.data, (r.status_code, r.data)
         assert spy.calls == []
