@@ -1,3 +1,5 @@
+import os
+
 # OpenAI settings
 OPENAI_MODEL = "gpt-5"
 OPENAI_TIMEOUT = 30.0
@@ -67,3 +69,12 @@ OCR_CONFIDENCE_EARLY_EXIT = 75
 # OCR image size cap — only resizes truly enormous captures (e.g. >4500px)
 OCR_MAX_IMAGE_PX = 4500  # trigger: longest edge must exceed this to resize
 OCR_TARGET_IMAGE_PX = 4032  # target longest edge after proportional resize
+
+# NER shadow candidate source. Disabled by default; when enabled (env
+# NER_ENABLED=true), the DistilBERT NER model emits shadow candidates with
+# source="ner" that the legacy Selector IGNORES — they are persisted for
+# measurement only and cannot affect selected output. Missing model files
+# log one warning and disable the source for the process (never fail a scan).
+NER_ENABLED = os.getenv("NER_ENABLED", "").strip().lower() == "true"
+NER_MODEL_DIR = "ml/models"
+NER_MAX_TOKENS = 256  # subword cap per inference; matches training max_length regime
