@@ -203,6 +203,21 @@ def llm_candidates(llm_result, fields, llm_scores):
     return candidates
 
 
+def plausible_recipient_name(value):
+    """Cheap plausibility check for a proposed recipient name.
+
+    Targets NER's known failure mode of bleeding into address lines: street
+    and tracking spans contain digits, and single-word names are already a
+    rule-engine suspect signal (_name_single_word vision trigger) — require
+    2+ tokens with no digits. Shared by the backtest simulation
+    (ner_backtest.py) and the name-selection policy so the offline numbers
+    and the runtime gate can never diverge.
+    """
+    if not value or any(ch.isdigit() for ch in value):
+        return False
+    return len(value.split()) >= 2
+
+
 def _ner_validations(field_name, value):
     """Cheap format/checksum validations for an NER prediction — recorded on
     the candidate as future calibration features."""
