@@ -73,8 +73,24 @@ OCR_TARGET_IMAGE_PX = 4032  # target longest edge after proportional resize
 # NER shadow candidate source. Disabled by default; when enabled (env
 # NER_ENABLED=true), the DistilBERT NER model emits shadow candidates with
 # source="ner" that the legacy Selector IGNORES — they are persisted for
-# measurement only and cannot affect selected output. Missing model files
+# measurement, and can only affect selected output for recipient_name when
+# NER_NAME_SELECTION_ENABLED is also set (see below). Missing model files
 # log one warning and disable the source for the process (never fail a scan).
 NER_ENABLED = os.getenv("NER_ENABLED", "").strip().lower() == "true"
 NER_MODEL_DIR = "ml/models"
 NER_MAX_TOKENS = 256  # subword cap per inference; matches training max_length regime
+
+# NER recipient_name selection (NerNamePolicy). Requires NER_ENABLED too —
+# this flag only controls whether the Selector may USE ner candidates, and
+# only ever for recipient_name; every other field is structurally untouched
+# (selection.NerNamePolicy returns the legacy decision before any NER logic).
+# Rollback: unset this env var -> exact shadow-mode behavior returns.
+NER_NAME_SELECTION_ENABLED = (
+    os.getenv("NER_NAME_SELECTION_ENABLED", "").strip().lower() == "true"
+)
+# Gate thresholds chosen by the ner_backtest.py sweep (33 held-out real-scan
+# rows): override 0.80 was the zero-loss point (81.8% vs 51.5% base); fill
+# applies to blank selections (~0% baseline) so it stays permissive.
+# Provisional until eval_candidates.py accumulates fresh ner rows.
+NER_NAME_FILL_MIN_CONFIDENCE = 0.50
+NER_NAME_OVERRIDE_MIN_CONFIDENCE = 0.80

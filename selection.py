@@ -128,6 +128,74 @@ class Selector:
         )
 
 
+class NerNamePolicy(Selector):
+    """Legacy policy plus a gated NER override for recipient_name ONLY.
+
+    Every field first gets the legacy Selector decision; any field other
+    than recipient_name returns it before NER is even looked at, so this
+    policy is structurally incapable of changing street_address, city,
+    state, zip_code, tracking_number, or carrier.
+
+    The recipient_name gate (evidence: calibration table + ner_backtest.py
+    sweep, both as of 2026-07-08):
+      - An llm-sourced selection is never overridden (measured 95.4%
+        accurate vs NER's ~73-83%).
+      - When the NER value normalizes to the legacy value, the legacy
+        selection is kept (same value, cheaper provenance).
+      - The NER value must pass plausible_recipient_name.
+      - A blank legacy selection is filled at
+        config.NER_NAME_FILL_MIN_CONFIDENCE (blank baseline ~0% accurate);
+        a non-empty one is overridden only at
+        config.NER_NAME_OVERRIDE_MIN_CONFIDENCE (the sweep's zero-loss
+        point).
+    """
+
+    def select(self, field_name, candidates, context):
+        base = super().select(field_name, candidates, context)
+        if field_name != "recipient_name":
+            return base
+
+        ner = next((c for c in candidates if c.source == "ner"), None)
+        if ner is None or not ner.value:
+            return base
+        if base.source == "llm":
+            return base
+        if normalize_comparison_value(ner.value) == normalize_comparison_value(
+            base.value
+        ):
+            return base
+        if not plausible_recipient_name(ner.value):
+            return base
+
+        if not base.value:
+            threshold = config.NER_NAME_FILL_MIN_CONFIDENCE
+            reason = "ner_name_fill"
+        else:
+            threshold = config.NER_NAME_OVERRIDE_MIN_CONFIDENCE
+            reason = "ner_name_override"
+        if ner.confidence < threshold:
+            return base
+
+        return Selection(
+            field=field_name,
+            value=ner.value,
+            source="ner",
+            confidence=ner.confidence,
+            reason=reason,
+            candidates=list(candidates),
+        )
+
+
+def get_selector():
+    """Selection policy for the current config: NerNamePolicy only when BOTH
+    NER flags are set (candidates exist AND may influence recipient_name),
+    otherwise the legacy-parity Selector. Checked per call so flag changes
+    (tests, rollback) take effect without a restart."""
+    if config.NER_ENABLED and config.NER_NAME_SELECTION_ENABLED:
+        return NerNamePolicy()
+    return Selector()
+
+
 # ---------------------------------------------------------------------------
 # Candidate builders for the existing sources
 # ---------------------------------------------------------------------------
@@ -222,7 +290,9 @@ def _ner_validations(field_name, value):
     """Cheap format/checksum validations for an NER prediction — recorded on
     the candidate as future calibration features."""
     validations = {}
-    if field_name == "state":
+    if field_name == "recipient_name":
+        validations["name_plausible"] = plausible_recipient_name(value)
+    elif field_name == "state":
         validations["format_valid"] = bool(re.fullmatch(r"[A-Z]{2}", value))
     elif field_name == "zip_code":
         validations["format_valid"] = bool(re.fullmatch(r"\d{5}(-\d{4})?", value))
