@@ -13,7 +13,7 @@ from ocr import get_best_ocr_text
 from scoring import normalize_comparison_value, score_label_data, score_llm_result
 from selection import (
     SelectionContext,
-    Selector,
+    get_selector,
     llm_candidates,
     ner_candidates,
     rule_candidates,
@@ -27,10 +27,6 @@ from tracking import (
 
 
 LLM_POLICIES = ("off", "auto", "force_vision")
-
-# Default selection policy (legacy-parity). Future calibrated policies are
-# alternate Selector implementations plugged in here.
-_selector = Selector()
 
 
 def _resolve_llm_policy(skip_llm, llm_policy):
@@ -246,10 +242,12 @@ def run(image_path, skip_llm=False, llm_policy=None):
     )
     llm_cands = llm_candidates(llm_result, selected_fields, llm_scores)
 
-    # NER shadow source (config.NER_ENABLED, default off): candidates are
-    # persisted for measurement only — the legacy Selector ignores
-    # source="ner", so selected output cannot change. The import stays
-    # inside the flag so a disabled deployment never touches onnxruntime.
+    # NER source (config.NER_ENABLED, default off): candidates are persisted
+    # for measurement; the legacy Selector ignores source="ner", and they can
+    # influence selection only for recipient_name via NerNamePolicy when
+    # NER_NAME_SELECTION_ENABLED is also set (see get_selector below). The
+    # import stays inside the flag so a disabled deployment never touches
+    # onnxruntime.
     ner_cands = {}
     if config.NER_ENABLED:
         from ner_extractor import get_extractor, ner_field_predictions
@@ -264,6 +262,11 @@ def run(image_path, skip_llm=False, llm_policy=None):
 
     selection_context = SelectionContext(llm_mode=llm_mode)
 
+    # Policy resolved per run so flag changes take effect without a restart:
+    # legacy-parity Selector by default; NerNamePolicy (recipient_name-only
+    # NER gate) when NER_ENABLED and NER_NAME_SELECTION_ENABLED are both set.
+    selector = get_selector()
+
     selections = {}
     for field in selected_fields:
         field_candidates = [rule_cands[field]]
@@ -271,7 +274,7 @@ def run(image_path, skip_llm=False, llm_policy=None):
             field_candidates.append(llm_cands[field])
         if field in ner_cands:
             field_candidates.append(ner_cands[field])
-        selections[field] = _selector.select(
+        selections[field] = selector.select(
             field, field_candidates, selection_context
         )
         log.debug(
@@ -365,6 +368,14 @@ def build_extraction_result(internal, label_id):
         ),
     }
 
+    # Additive NER telemetry (metadata.ner) — emitted only when the
+    # name-selection policy actually chose an NER value, so default-flag
+    # output (and the golden parity file) is byte-identical.
+    fields_from_ner = sorted(
+        field for field, source in selected_sources.items() if source == "ner"
+    )
+    ner_telemetry = {"fields_from_ner": fields_from_ner} if fields_from_ner else {}
+
     selections = internal.get("_selections") or {}
 
     def _fv(name):
@@ -407,6 +418,13 @@ def build_extraction_result(internal, label_id):
                     # LLM candidate confidence = score_llm_result cross-
                     # validation (0.85 found in OCR / 0.75 plausible from image)
                     conf = selection.confidence
+            elif raw == "ner":
+                # NerNamePolicy selection (recipient_name only): carry the
+                # NER candidate's confidence — the scored rule confidence
+                # describes a value that was not selected.
+                source = "ner"
+                if selection is not None:
+                    conf = selection.confidence
             else:
                 source = "rule"
         return FieldValue(value=value, confidence=conf, source=source)
@@ -426,4 +444,5 @@ def build_extraction_result(internal, label_id):
         llm_mode=llm_mode,
         ocr_rotations_tried=ocr_rotations_tried,
         llm_telemetry=llm_telemetry,
+        ner_telemetry=ner_telemetry,
     )

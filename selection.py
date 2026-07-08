@@ -304,10 +304,10 @@ def _ner_validations(field_name, value):
 
 
 def ner_candidates(ner_predictions, fields, model_version="ner"):
-    """Build shadow candidates from NER predictions.
+    """Build candidates from NER predictions.
 
-    The legacy Selector IGNORES source="ner" candidates — they exist to be
-    persisted and measured, not to influence selection. Confidence is the
+    The legacy Selector IGNORES source="ner" candidates (shadow mode);
+    NerNamePolicy may select them for recipient_name only. Confidence is the
     model's uncalibrated span probability, routed through the configured
     ConfidenceModel like every other source (the calibrated table has no
     ner buckets yet, so it passes through unchanged). Fields where the

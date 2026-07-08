@@ -1,8 +1,10 @@
 """ONNX Runtime inference for the shipping-label NER model.
 
-Shadow candidate source: predictions become Candidates with source="ner"
-that the legacy Selector ignores, so this module can never affect selected
-output (see docs/architecture-candidate-selector.md).
+Candidate source: predictions become Candidates with source="ner". The
+legacy Selector ignores them (shadow mode); selection.NerNamePolicy may
+select them for recipient_name ONLY, and only when NER_ENABLED and
+NER_NAME_SELECTION_ENABLED are both set (see
+docs/architecture-candidate-selector.md).
 
 Design constraints:
 - Heavy imports (onnxruntime, tokenizers, numpy) happen inside the class,

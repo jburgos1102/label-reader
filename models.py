@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 class FieldValue:
     value: str
     confidence: float  # 0.0–1.0
-    source: str        # "barcode" | "ocr" | "rule" | "llm" | "agreement" | "blank"
+    source: str  # "barcode" | "ocr" | "rule" | "llm" | "agreement" | "ner" | "blank"
 
 
 EXTRACTION_FIELDS = (
@@ -36,9 +36,12 @@ class ExtractionResult:
     ocr_rotations_tried: int = 4
     # Additive telemetry rendered as metadata.llm; existing keys unchanged.
     llm_telemetry: dict = field(default_factory=dict)
+    # Rendered as metadata.ner ONLY when non-empty (fields_from_ner), so
+    # payloads with the NER flags off are byte-identical to historical ones.
+    ner_telemetry: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "label_id": self.label_id,
             "extracted": {
                 name: {
@@ -65,3 +68,6 @@ class ExtractionResult:
                 "llm": self.llm_telemetry,
             },
         }
+        if self.ner_telemetry:
+            result["metadata"]["ner"] = self.ner_telemetry
+        return result
