@@ -77,7 +77,10 @@ OCR_TARGET_IMAGE_PX = 4032  # target longest edge after proportional resize
 # NER_NAME_SELECTION_ENABLED is also set (see below). Missing model files
 # log one warning and disable the source for the process (never fail a scan).
 NER_ENABLED = os.getenv("NER_ENABLED", "").strip().lower() == "true"
-NER_MODEL_DIR = "ml/models"
+# Anchored to the repository root: the model must load regardless of the
+# process working directory (a relative path made NER silently latch off
+# for the process lifetime when the app was launched from elsewhere).
+NER_MODEL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ml", "models")
 NER_MAX_TOKENS = 256  # subword cap per inference; matches training max_length regime
 
 # NER recipient_name selection (NerNamePolicy). Requires NER_ENABLED too —
