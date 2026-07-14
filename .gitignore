@@ -1,3 +1,4 @@
+.gitignore
 venv/
 __pycache__/
 uploads/
@@ -7,3 +8,5 @@ captures/
 label_storage.db
 ml/training_data/
 ml/models/
+.claude/
+CLAUDE.md
